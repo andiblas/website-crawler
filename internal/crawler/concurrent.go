@@ -1,26 +1,26 @@
-package main
+package crawler
 
 import (
 	"fmt"
-	"io"
-	"log"
-	"net/http"
 	"net/url"
-	"strings"
 	"sync"
 	"time"
 
-	"golang.org/x/net/html"
+	"github.com/andiblas/website-crawler/internal/fetcher"
+	"github.com/andiblas/website-crawler/internal/linkextractor"
 )
 
-const crawlerWorkerAmount = 20
+const crawlerWorkerAmount = 5
 
-func main() {
-	urlToCrawl, err := url.Parse("https://parserdigital.com/")
-	if err != nil {
-		log.Fatalf("url to crawl is invalid")
-	}
+type Concurrent struct {
+	fetcher fetcher.Fetcher
+}
 
+func NewConcurrent(fetcher fetcher.Fetcher) *Concurrent {
+	return &Concurrent{fetcher: fetcher}
+}
+
+func (c *Concurrent) Crawl(urlToCrawl url.URL) ([]string, error) {
 	pendingURLch := make(chan string) // Channel to hold pending URLs
 	currentCrawlingCh := make(chan int)
 	finishCh := make(chan struct{})
@@ -29,7 +29,7 @@ func main() {
 	// Start the workers
 	for i := 0; i < crawlerWorkerAmount; i++ {
 		println("starting crawlerworker")
-		go crawlerWorker(fmt.Sprintf("Worker #%d", i), pendingURLch, currentCrawlingCh, &visitedLinksMap)
+		go crawlerWorker(fmt.Sprintf("Worker #%d", i), c.fetcher, pendingURLch, currentCrawlingCh, &visitedLinksMap)
 	}
 
 	go func() {
@@ -58,10 +58,11 @@ func main() {
 		})
 		fmt.Printf("amount of links crawled: %d\n", linksCrawledAmount)
 	}
+
+	return nil, nil
 }
 
-func crawlerWorker(workerName string, pendingURLch chan string, currentCrawling chan int, visitedLinksMap *sync.Map) {
-	println("inside crawlerWorker")
+func crawlerWorker(workerName string, fetcher fetcher.Fetcher, pendingURLch chan string, currentCrawling chan int, visitedLinksMap *sync.Map) {
 	for linkToCrawl := range pendingURLch {
 		println("inside range")
 		currentCrawling <- 1
@@ -75,7 +76,7 @@ func crawlerWorker(workerName string, pendingURLch chan string, currentCrawling 
 			continue
 		}
 		fmt.Printf("[%s]\tCrawlWebpage start: %s\n", workerName, parsedLink)
-		links, err := CrawlWebpage(*parsedLink)
+		links, err := crawlWebpage(fetcher, *parsedLink)
 		fmt.Printf("[%s]\tCrawlWebpage finish: %s.\n", workerName, parsedLink)
 		if err != nil {
 			currentCrawling <- -1
@@ -103,80 +104,16 @@ func addLinksToPendingURLChannel(workerName string, links []string, pendingURLch
 	fmt.Printf("[%s]\tRETURNING...\n", workerName)
 }
 
-func CrawlWebpage(webpageURL url.URL) ([]string, error) {
-	webpageContent := GetWebpageContent(webpageURL)
+func crawlWebpage(httpFetcher fetcher.Fetcher, webpageURL url.URL) ([]string, error) {
+	webpageContent, err := httpFetcher.GetWebpageContent(webpageURL)
+	if err != nil {
+		return nil, err
+	}
 
-	links, err := ExtractLinks(webpageURL, webpageContent)
+	links, err := linkextractor.Extract(webpageURL, webpageContent)
 	if err != nil {
 		return nil, err
 	}
 
 	return links, nil
-}
-
-func GetWebpageContent(url url.URL) string {
-	res, err := http.Get(url.String())
-	if err != nil {
-		log.Fatal(err)
-	}
-	content, err := io.ReadAll(res.Body)
-	defer res.Body.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return string(content)
-}
-
-func ExtractLinks(webpageURL url.URL, webpageContent string) ([]string, error) {
-	parsedHtmlContent, err := html.Parse(strings.NewReader(webpageContent))
-	if err != nil {
-		return nil, err
-	}
-
-	links := searchDomainMatchingLinks(webpageURL, parsedHtmlContent)
-	// TODO normalize links
-	linksWithoutDuplicates := removeDuplicates(links)
-
-	return linksWithoutDuplicates, nil
-}
-
-func removeDuplicates(links []string) []string {
-	uniqueMap := make(map[string]bool)
-	uniqueSlice := make([]string, 0)
-
-	for _, link := range links {
-		if !uniqueMap[link] {
-			uniqueMap[link] = true
-			uniqueSlice = append(uniqueSlice, link)
-		}
-	}
-
-	return uniqueSlice
-}
-
-func searchDomainMatchingLinks(webpageURL url.URL, node *html.Node) []string {
-	var links []string
-	if node.Type == html.ElementNode && node.Data == "a" {
-		for _, attr := range node.Attr {
-			if attr.Key == "href" && domainMatches(webpageURL, attr.Val) {
-				links = append(links, attr.Val)
-			}
-		}
-	}
-
-	for child := node.FirstChild; child != nil; child = child.NextSibling {
-		links = append(links, searchDomainMatchingLinks(webpageURL, child)...)
-	}
-
-	return links
-}
-
-func domainMatches(webpageURL url.URL, hrefValue string) bool {
-	hrefUrl, err := url.Parse(hrefValue)
-	if err != nil {
-		return false
-	}
-
-	return webpageURL.Host == hrefUrl.Host
 }
