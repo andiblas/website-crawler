@@ -13,7 +13,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-const crawlerWorkerAmount = 50
+const crawlerWorkerAmount = 20
 
 func main() {
 	urlToCrawl, err := url.Parse("https://parserdigital.com/")
@@ -22,44 +22,71 @@ func main() {
 	}
 
 	pendingURLch := make(chan string) // Channel to hold pending URLs
+	currentCrawlingCh := make(chan int)
+	finishCh := make(chan struct{})
 	visitedLinksMap := sync.Map{}
 
 	// Start the workers
 	for i := 0; i < crawlerWorkerAmount; i++ {
-		go crawlerWorker(fmt.Sprintf("Worker #%d", i), pendingURLch, &visitedLinksMap)
+		println("starting crawlerworker")
+		go crawlerWorker(fmt.Sprintf("Worker #%d", i), pendingURLch, currentCrawlingCh, &visitedLinksMap)
 	}
+
+	go func() {
+		currentCrawling := 0
+		for currentCrawl := range currentCrawlingCh {
+			currentCrawling += currentCrawl
+			fmt.Printf("[MONITOR]\tCurrently Crawling: %d\n", currentCrawling)
+			if currentCrawling == 0 {
+				fmt.Printf("[MONITOR]\tcurrentCrawling == 0. Closing channels.\n")
+				close(pendingURLch)
+				close(finishCh)
+			}
+		}
+	}()
 
 	// Add the starting URL to the pending URLs channel
 	addLinksToPendingURLChannel("main", []string{urlToCrawl.String()}, pendingURLch, &visitedLinksMap)
 
 	select {
-	case <-time.After(time.Second * 20):
+	case <-time.After(time.Second * 30):
+		linksCrawledAmount := 0
+		visitedLinksMap.Range(func(key, value any) bool {
+			linksCrawledAmount++
+			fmt.Printf("key: %s, value: %s\n", key, value)
+			return true
+		})
+		fmt.Printf("amount of links crawled: %d\n", linksCrawledAmount)
 	}
-
-	visitedLinksMap.Range(func(key, value any) bool {
-		fmt.Printf("key: %s, value: %s\n", key, value)
-		return true
-	})
-
 }
 
-func crawlerWorker(workerName string, pendingURLch chan string, visitedLinksMap *sync.Map) {
+func crawlerWorker(workerName string, pendingURLch chan string, currentCrawling chan int, visitedLinksMap *sync.Map) {
+	println("inside crawlerWorker")
 	for linkToCrawl := range pendingURLch {
+		println("inside range")
+		currentCrawling <- 1
 		fmt.Printf("[%s]\tStarting to crawl link: %s\n", workerName, linkToCrawl)
 		visitedLinksMap.Store(linkToCrawl, true)
 
 		parsedLink, err := url.Parse(linkToCrawl)
 		if err != nil {
+			currentCrawling <- -1
 			fmt.Printf("[%s]\tcould not parse link [%s]. ignoring.\n", workerName, linkToCrawl)
 			continue
 		}
+		fmt.Printf("[%s]\tCrawlWebpage start: %s\n", workerName, parsedLink)
 		links, err := CrawlWebpage(*parsedLink)
+		fmt.Printf("[%s]\tCrawlWebpage finish: %s.\n", workerName, parsedLink)
 		if err != nil {
+			currentCrawling <- -1
 			fmt.Printf("[%s]\terror while crawling %s.", workerName, linkToCrawl)
 			continue
 		}
 
+		fmt.Printf("[%s]\taddLinksToPendingURLChannel start.\n", workerName)
 		addLinksToPendingURLChannel(workerName, links, pendingURLch, visitedLinksMap)
+		fmt.Printf("[%s]\taddLinksToPendingURLChannel finish.\n", workerName)
+		currentCrawling <- -1
 	}
 }
 
@@ -68,8 +95,12 @@ func addLinksToPendingURLChannel(workerName string, links []string, pendingURLch
 		if _, ok := visitedLinksMap.Load(link); ok == false {
 			fmt.Printf("[%s]\tADDING LINK TO CHANNEL: %s\n", workerName, link)
 			pendingURLch <- link
+			fmt.Printf("[%s]\tLINK ADDED TO CHANNEL: %s. CHANNEL LEN (pendingURLch): %d\n", workerName, link, len(pendingURLch))
+		} else {
+			fmt.Printf("[%s]\tLINK ALREADY EXISTS: %s\n", workerName, link)
 		}
 	}
+	fmt.Printf("[%s]\tRETURNING...\n", workerName)
 }
 
 func CrawlWebpage(webpageURL url.URL) ([]string, error) {
@@ -104,6 +135,7 @@ func ExtractLinks(webpageURL url.URL, webpageContent string) ([]string, error) {
 	}
 
 	links := searchDomainMatchingLinks(webpageURL, parsedHtmlContent)
+	// TODO normalize links
 	linksWithoutDuplicates := removeDuplicates(links)
 
 	return linksWithoutDuplicates, nil
