@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"sync"
 
-	"github.com/andiblas/website-crawler/internal/fetcher"
-	"github.com/andiblas/website-crawler/internal/linkextractor"
+	"github.com/andiblas/website-crawler/pkg/fetcher"
+	"github.com/andiblas/website-crawler/pkg/linkextractor"
 )
 
 type Concurrent struct {

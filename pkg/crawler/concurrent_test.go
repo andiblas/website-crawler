@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/andiblas/website-crawler/internal/fetcher"
+	"github.com/andiblas/website-crawler/pkg/fetcher"
 )
 
 const (
@@ -18,7 +18,7 @@ type mockFetcher struct {
 	throwError     error
 }
 
-func (m mockFetcher) FetchWebpageContent(url url.URL) (string, error) {
+func (m mockFetcher) FetchWebpageContent(_ url.URL) (string, error) {
 	return m.webpageContent, m.throwError
 }
 

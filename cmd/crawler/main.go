@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/andiblas/website-crawler/internal/crawler"
-	"github.com/andiblas/website-crawler/internal/fetcher"
+	"github.com/andiblas/website-crawler/pkg/crawler"
+	"github.com/andiblas/website-crawler/pkg/fetcher"
 )
 
 const defaultTimeout = 15000
