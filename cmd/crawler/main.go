@@ -27,7 +27,8 @@ func main() {
 	httpFetcher := fetcher.NewHTTPFetcher(&http.Client{
 		Timeout: time.Duration(timeout) * time.Millisecond,
 	})
-	concurrentCrawler := crawler.NewConcurrent(httpFetcher)
+	backoffRetryFetcher := fetcher.NewExpBackoffRetryFetcher(httpFetcher, 3, time.Second*4)
+	concurrentCrawler := crawler.NewConcurrent(backoffRetryFetcher)
 
 	crawledLinks, err := concurrentCrawler.Crawl(parsedUrl)
 	if err != nil {

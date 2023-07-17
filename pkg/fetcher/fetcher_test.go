@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 type mockHttpGetter struct {
@@ -45,6 +46,43 @@ func TestHTTPFetcher_FetchWebpageContent(t *testing.T) {
 		_, err := httpFetcherError.FetchWebpageContent(url.URL{})
 		if err == nil {
 			t.Errorf("should throw error at httpFetcher.FetchWebpageContent for mocked httpgetter")
+		}
+	})
+}
+
+type mockRetryFetcher struct {
+	numberOfRetriesToWork int
+	currentRetry          int
+}
+
+func (m *mockRetryFetcher) FetchWebpageContent(_ url.URL) (string, error) {
+	if m.numberOfRetriesToWork == m.currentRetry {
+		return "", nil
+	}
+	m.currentRetry++
+	return "", errors.New("error")
+}
+
+func TestExpBackoffRetryFetcher_FetchWebpageContent(t *testing.T) {
+	t.Run("should retry until it gets the result from the inner fetcher", func(t *testing.T) {
+		backoffRetryFetcher := NewExpBackoffRetryFetcher(&mockRetryFetcher{
+			numberOfRetriesToWork: 2,
+		}, 3, time.Second)
+
+		_, err := backoffRetryFetcher.FetchWebpageContent(url.URL{})
+		if err != nil {
+			t.Errorf("should not throw error at backoffRetryFetcher.FetchWebpageContent")
+		}
+	})
+
+	t.Run("gets error after retrying", func(t *testing.T) {
+		backoffRetryFetcher := NewExpBackoffRetryFetcher(&mockRetryFetcher{
+			numberOfRetriesToWork: 100,
+		}, 2, time.Second)
+
+		_, err := backoffRetryFetcher.FetchWebpageContent(url.URL{})
+		if err == nil {
+			t.Errorf("should throw error at backoffRetryFetcher.FetchWebpageContent")
 		}
 	})
 }
