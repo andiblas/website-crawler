@@ -1,6 +1,7 @@
 package crawler
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"sync"
@@ -45,6 +46,11 @@ func (c *Concurrent) Crawl(urlToCrawl url.URL) ([]string, error) {
 		crawledLinks = append(crawledLinks, key.(string))
 		return true
 	})
+
+	if crawlingErrors != nil {
+		return crawledLinks, errors.New("there were errors while crawling")
+	}
+
 	return crawledLinks, nil
 }
 
@@ -57,6 +63,7 @@ func crawlerWorker(urlToCrawl url.URL, fetcher fetcher.Fetcher, visitedLinksMap 
 	visitedLinksMap.Store(urlToCrawl.String(), true)
 	links, err := crawlWebpage(fetcher, urlToCrawl)
 	if err != nil {
+		visitedLinksMap.Delete(urlToCrawl.String())
 		errorsCh <- err
 		finishCh <- true
 		return

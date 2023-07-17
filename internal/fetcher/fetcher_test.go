@@ -16,12 +16,9 @@ type mockHttpGetter struct {
 }
 
 func (m mockHttpGetter) Get(_ string) (resp *http.Response, err error) {
-	if m.throwError != nil {
-		return nil, m.throwError
-	}
 	return &http.Response{
 		Body: io.NopCloser(strings.NewReader(m.webpageContent)),
-	}, nil
+	}, m.throwError
 }
 
 func TestHTTPFetcher_FetchWebpageContent(t *testing.T) {
