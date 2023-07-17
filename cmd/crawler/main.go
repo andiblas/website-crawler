@@ -17,7 +17,7 @@ const defaultTimeout = 15000
 
 func main() {
 	urlToCrawlArg := flag.String("url", "", "URL to crawl.")
-	timeoutArg := flag.Int("timeout", defaultTimeout, "Please set the timeout in milliseconds. Default: 10000 milliseconds.")
+	timeoutArg := flag.Int("timeout", defaultTimeout, "Please set the timeout in milliseconds.")
 
 	flag.Parse()
 
@@ -31,7 +31,7 @@ func main() {
 
 	crawledLinks, err := concurrentCrawler.Crawl(parsedUrl)
 	if err != nil {
-		log.Fatalf("execution error: %v", err)
+		fmt.Printf("%v\n", err)
 	}
 
 	printResults(crawledLinks)
