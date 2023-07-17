@@ -7,39 +7,39 @@ import (
 	"golang.org/x/net/html"
 )
 
-func Extract(webpageURL url.URL, webpageContent string) ([]string, error) {
+func Extract(webpageURL url.URL, webpageContent string) ([]url.URL, error) {
 	parsedHtmlContent, err := html.Parse(strings.NewReader(webpageContent))
 	if err != nil {
 		return nil, err
 	}
 
+	// I'm aware that the following links manipulation represents
+	// a O(3n) operation and could be improved. I opted with this
+	// approach since we are not going to deal with huge amounts
+	// of links and also for the sake of readability.
 	links := searchDomainMatchingLinks(webpageURL, parsedHtmlContent)
-	// TODO normalize links
 	linksWithoutDuplicates := removeDuplicates(links)
+	normalizedLinks := normalizeLinks(linksWithoutDuplicates)
 
-	return linksWithoutDuplicates, nil
+	return normalizedLinks, nil
 }
 
-func removeDuplicates(links []string) []string {
-	uniqueMap := make(map[string]bool)
-	uniqueSlice := make([]string, 0)
-
-	for _, link := range links {
-		if !uniqueMap[link] {
-			uniqueMap[link] = true
-			uniqueSlice = append(uniqueSlice, link)
-		}
+func Normalize(urlToNormalize url.URL) url.URL {
+	return url.URL{
+		Scheme: urlToNormalize.Scheme,
+		Host:   strings.Replace(urlToNormalize.Host, "www.", "", -1),
+		Path:   strings.TrimRight(urlToNormalize.Path, "/"),
 	}
-
-	return uniqueSlice
 }
 
-func searchDomainMatchingLinks(webpageURL url.URL, node *html.Node) []string {
-	var links []string
+func searchDomainMatchingLinks(webpageURL url.URL, node *html.Node) []url.URL {
+	var links []url.URL
 	if node.Type == html.ElementNode && node.Data == "a" {
 		for _, attr := range node.Attr {
-			if attr.Key == "href" && domainMatches(webpageURL, attr.Val) {
-				links = append(links, attr.Val)
+			if attr.Key == "href" {
+				if parsedLink, matches := domainMatches(webpageURL, attr.Val); matches {
+					links = append(links, parsedLink)
+				}
 			}
 		}
 	}
@@ -51,11 +51,33 @@ func searchDomainMatchingLinks(webpageURL url.URL, node *html.Node) []string {
 	return links
 }
 
-func domainMatches(webpageURL url.URL, hrefValue string) bool {
-	hrefUrl, err := url.Parse(hrefValue)
-	if err != nil {
-		return false
+func removeDuplicates(links []url.URL) []url.URL {
+	uniqueMap := make(map[string]bool)
+	uniqueSlice := make([]url.URL, 0)
+
+	for _, link := range links {
+		if !uniqueMap[link.String()] {
+			uniqueMap[link.String()] = true
+			uniqueSlice = append(uniqueSlice, link)
+		}
 	}
 
-	return webpageURL.Host == hrefUrl.Host
+	return uniqueSlice
+}
+
+func normalizeLinks(links []url.URL) []url.URL {
+	var normalizedLinks []url.URL
+	for _, link := range links {
+		normalizedLinks = append(normalizedLinks, Normalize(link))
+	}
+	return normalizedLinks
+}
+
+func domainMatches(webpageURL url.URL, hrefValue string) (url.URL, bool) {
+	hrefUrl, err := url.Parse(hrefValue)
+	if err != nil {
+		return url.URL{}, false
+	}
+
+	return *hrefUrl, webpageURL.Host == hrefUrl.Host
 }
