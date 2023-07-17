@@ -75,7 +75,7 @@ func crawlerWorker(urlToCrawl url.URL, fetcher fetcher.Fetcher, visitedLinksMap 
 }
 
 func crawlWebpage(httpFetcher fetcher.Fetcher, webpageURL url.URL) ([]url.URL, error) {
-	webpageContent, err := httpFetcher.GetWebpageContent(webpageURL)
+	webpageContent, err := httpFetcher.FetchWebpageContent(webpageURL)
 	if err != nil {
 		return nil, err
 	}

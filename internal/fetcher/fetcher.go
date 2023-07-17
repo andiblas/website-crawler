@@ -7,7 +7,7 @@ import (
 )
 
 type Fetcher interface {
-	GetWebpageContent(url url.URL) (string, error)
+	FetchWebpageContent(url url.URL) (string, error)
 }
 
 type HTTPFetcher struct {
@@ -22,7 +22,7 @@ func NewHTTPFetcher(httpClient httpGetter) *HTTPFetcher {
 	return &HTTPFetcher{httpClient: httpClient}
 }
 
-func (f *HTTPFetcher) GetWebpageContent(url url.URL) (string, error) {
+func (f *HTTPFetcher) FetchWebpageContent(url url.URL) (string, error) {
 	res, err := f.httpClient.Get(url.String())
 	if err != nil {
 		return "", err

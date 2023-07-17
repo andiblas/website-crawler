@@ -13,7 +13,7 @@ import (
 	"github.com/andiblas/website-crawler/internal/fetcher"
 )
 
-const defaultTimeout = 10000
+const defaultTimeout = 15000
 
 func main() {
 	urlToCrawlArg := flag.String("url", "", "URL to crawl.")
