@@ -52,7 +52,7 @@ func (c *Concurrent) Crawl(urlToCrawl url.URL) ([]string, error) {
 	})
 
 	if crawlingErrors != nil {
-		return crawledLinks, errors.New("there were errors while crawling")
+		return crawledLinks, errors.New("there were errors while crawling. please check logs")
 	}
 
 	return crawledLinks, nil
