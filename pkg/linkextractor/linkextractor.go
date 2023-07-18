@@ -7,6 +7,8 @@ import (
 	"golang.org/x/net/html"
 )
 
+// Extract extracts URLs from the given webpage content and returns a slice of normalized URLs.
+// The function parses the HTML content of the webpage and searches for links within the same domain as the provided webpageURL.
 func Extract(webpageURL url.URL, webpageContent string) ([]url.URL, error) {
 	parsedHtmlContent, err := html.Parse(strings.NewReader(webpageContent))
 	if err != nil {
