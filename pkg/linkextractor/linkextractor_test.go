@@ -7,14 +7,16 @@ import (
 )
 
 const (
-	htmlWithLinks         = `<a href="https://test.com"></a><a href="https://google.com"></a>`
-	htmlWithNoLinks       = `<body><p>I have no links</p></body>`
-	htmlWithRepeatedLinks = `<a href="https://test.com"/><a href="https://google.com"/><a href="https://test.com"/>`
+	htmlWithLinks                   = `<a href="https://test.com"></a><a href="https://google.com"></a>`
+	htmlWithNoLinks                 = `<body><p>I have no links</p></body>`
+	htmlWithRepeatedLinks           = `<a href="https://test.com"/><a href="https://google.com"/><a href="https://test.com"/>`
+	htmlWithLinksWithoutNormalizing = `<a href="https://test.com"/><a href="https://www.test.com/contact"/>`
 )
 
 func TestExtract(t *testing.T) {
 	testUrl, _ := url.Parse("https://test.com")
 	assertUrl, _ := url.Parse("https://test.com")
+	assertUrl2, _ := url.Parse("https://test.com/contact")
 	type args struct {
 		webpageURL     url.URL
 		webpageContent string
@@ -53,6 +55,18 @@ func TestExtract(t *testing.T) {
 			},
 			want: []url.URL{
 				*assertUrl,
+			},
+			wantErr: false,
+		},
+		{
+			name: "extracts links that are not normalized",
+			args: args{
+				webpageURL:     *testUrl,
+				webpageContent: htmlWithLinksWithoutNormalizing,
+			},
+			want: []url.URL{
+				*assertUrl,
+				*assertUrl2,
 			},
 			wantErr: false,
 		},

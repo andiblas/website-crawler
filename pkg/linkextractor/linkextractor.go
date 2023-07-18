@@ -79,5 +79,5 @@ func domainMatches(webpageURL url.URL, hrefValue string) (url.URL, bool) {
 		return url.URL{}, false
 	}
 
-	return *hrefUrl, webpageURL.Host == hrefUrl.Host
+	return *hrefUrl, webpageURL.Host == Normalize(*hrefUrl).Host
 }
