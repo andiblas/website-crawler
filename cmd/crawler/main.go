@@ -6,8 +6,13 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
+
+	"golang.org/x/net/context"
 
 	"github.com/andiblas/website-crawler/pkg/crawler"
 	"github.com/andiblas/website-crawler/pkg/fetcher"
@@ -30,7 +35,18 @@ func main() {
 	backoffRetryFetcher := fetcher.NewExpBackoffRetryFetcher(httpFetcher, 3, time.Second*4)
 	concurrentCrawler := crawler.NewConcurrent(backoffRetryFetcher)
 
-	crawledLinks, err := concurrentCrawler.Crawl(parsedUrl)
+	ctx := context.Background()
+	cancelCtx, cancelFunc := context.WithCancel(ctx)
+
+	go func() {
+		// listen for interrupt signal
+		interrupt := make(chan os.Signal, 1)
+		signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
+		<-interrupt
+		cancelFunc()
+	}()
+
+	crawledLinks, err := concurrentCrawler.Crawl(cancelCtx, parsedUrl)
 	if err != nil {
 		fmt.Printf("%v\n", err)
 	}
@@ -39,7 +55,7 @@ func main() {
 }
 
 func printResults(crawledLinks []string) {
-	fmt.Printf("[RESULTS] Total links found: %d\n", len(crawledLinks))
+	fmt.Printf("[RESULTS] Links found: %d\n", len(crawledLinks))
 	for index, crawledLink := range crawledLinks {
 		fmt.Printf("[Link #%d] %s\n", index, crawledLink)
 	}
