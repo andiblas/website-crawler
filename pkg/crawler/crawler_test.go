@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"testing"
 
+	"golang.org/x/net/context"
+
 	"github.com/andiblas/website-crawler/pkg/fetcher"
 )
 
@@ -28,6 +30,7 @@ func TestConcurrent_Crawl(t *testing.T) {
 		fetcher fetcher.Fetcher
 	}
 	type args struct {
+		ctx        context.Context
 		urlToCrawl url.URL
 	}
 	tests := []struct {
@@ -43,7 +46,10 @@ func TestConcurrent_Crawl(t *testing.T) {
 				webpageContent: htmlWithSingleLink,
 				throwError:     nil,
 			}},
-			args: args{urlToCrawl: *testUrl},
+			args: args{
+				ctx:        context.Background(),
+				urlToCrawl: *testUrl,
+			},
 			want: map[string]bool{
 				"https://test.com": true,
 			},
@@ -55,7 +61,10 @@ func TestConcurrent_Crawl(t *testing.T) {
 				webpageContent: htmlWithThreeLinks,
 				throwError:     nil,
 			}},
-			args: args{urlToCrawl: *testUrl},
+			args: args{
+				ctx:        context.Background(),
+				urlToCrawl: *testUrl,
+			},
 			want: map[string]bool{
 				"https://test.com":          true,
 				"https://test.com/about-us": true,
@@ -69,7 +78,10 @@ func TestConcurrent_Crawl(t *testing.T) {
 				webpageContent: "",
 				throwError:     errors.New("error"),
 			}},
-			args:    args{urlToCrawl: *testUrl},
+			args: args{
+				ctx:        context.Background(),
+				urlToCrawl: *testUrl,
+			},
 			want:    map[string]bool{},
 			wantErr: true,
 		},
@@ -79,7 +91,7 @@ func TestConcurrent_Crawl(t *testing.T) {
 			c := &Concurrent{
 				fetcher: tt.fields.fetcher,
 			}
-			got, err := c.Crawl(nil, tt.args.urlToCrawl)
+			got, err := c.Crawl(tt.args.ctx, tt.args.urlToCrawl)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Crawl() error = %v, wantErr %v", err, tt.wantErr)
 				return
