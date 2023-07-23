@@ -79,7 +79,7 @@ func TestConcurrent_Crawl(t *testing.T) {
 			c := &Concurrent{
 				fetcher: tt.fields.fetcher,
 			}
-			got, err := c.Crawl(tt.args.urlToCrawl)
+			got, err := c.Crawl(nil, tt.args.urlToCrawl)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Crawl() error = %v, wantErr %v", err, tt.wantErr)
 				return

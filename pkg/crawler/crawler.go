@@ -6,12 +6,14 @@ import (
 	"net/url"
 	"sync"
 
+	"golang.org/x/net/context"
+
 	"github.com/andiblas/website-crawler/pkg/fetcher"
 	"github.com/andiblas/website-crawler/pkg/linkextractor"
 )
 
 type Crawler interface {
-	Crawl(url url.URL) ([]string, error)
+	Crawl(ctx context.Context, urlToCrawl url.URL) ([]string, error)
 }
 
 type Concurrent struct {
@@ -27,12 +29,12 @@ func NewConcurrent(fetcher fetcher.Fetcher) *Concurrent {
 //
 //	u, err := url.Parse("https://test.com")
 //	linksFound, err := concurrent.Crawl(u)
-func (c *Concurrent) Crawl(urlToCrawl url.URL) ([]string, error) {
+func (c *Concurrent) Crawl(ctx context.Context, urlToCrawl url.URL) ([]string, error) {
 	finishCh := make(chan bool)
 	errorsCh := make(chan error)
 	visitedLinksMap := sync.Map{}
 
-	go crawlerWorker(linkextractor.Normalize(urlToCrawl), c.fetcher, &visitedLinksMap, errorsCh, finishCh)
+	go crawlerWorker(ctx, linkextractor.Normalize(urlToCrawl), c.fetcher, &visitedLinksMap, errorsCh, finishCh)
 
 	// listen for any errors that may occur while crawling in child crawlers
 	var crawlingErrors []error
@@ -40,9 +42,11 @@ func (c *Concurrent) Crawl(urlToCrawl url.URL) ([]string, error) {
 		select {
 		case err := <-errorsCh:
 			crawlingErrors = append(crawlingErrors, err)
+		case <-ctx.Done():
+			fmt.Println("crawling interrupted.")
+			loop = false
 		case <-finishCh:
 			loop = false
-			break
 		}
 	}
 
@@ -63,7 +67,7 @@ func (c *Concurrent) Crawl(urlToCrawl url.URL) ([]string, error) {
 	return crawledLinks, nil
 }
 
-func crawlerWorker(urlToCrawl url.URL, fetcher fetcher.Fetcher, visitedLinksMap *sync.Map, errorsCh chan error, finishCh chan bool) {
+func crawlerWorker(ctx context.Context, urlToCrawl url.URL, fetcher fetcher.Fetcher, visitedLinksMap *sync.Map, errorsCh chan error, finishCh chan bool) {
 	if _, ok := visitedLinksMap.Load(urlToCrawl.String()); ok != false {
 		finishCh <- true
 		return
@@ -80,7 +84,7 @@ func crawlerWorker(urlToCrawl url.URL, fetcher fetcher.Fetcher, visitedLinksMap 
 
 	childFinishChannel := make(chan bool)
 	for _, link := range links {
-		go crawlerWorker(link, fetcher, visitedLinksMap, errorsCh, childFinishChannel)
+		go crawlerWorker(nil, link, fetcher, visitedLinksMap, errorsCh, childFinishChannel)
 	}
 
 	for i := 0; i < len(links); i++ {
