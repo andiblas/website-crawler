@@ -18,22 +18,33 @@ import (
 	"github.com/andiblas/website-crawler/pkg/fetcher"
 )
 
-const defaultTimeout = 15000
+const (
+	defaultTimeout         = 15000
+	defaultNumberOfRetries = 3
+)
 
 func main() {
 	urlToCrawlArg := flag.String("url", "", "URL to crawl.")
-	timeoutArg := flag.Int("timeout", defaultTimeout, "Please set the timeout in milliseconds.")
+	timeoutArg := flag.Int("timeout", defaultTimeout, "Please set the timeout in milliseconds. Must be greater than 0.")
+	numberOfRetriesArg := flag.Int("retries", defaultNumberOfRetries, "Set the number of retries the crawler will try to fetch a page in case of errors. Must be 0 or greater than 0.")
 
 	flag.Parse()
 
 	timeout := validateTimeoutArg(*timeoutArg)
 	parsedUrl := validateUrlToCrawl(*urlToCrawlArg)
+	numberOfRetries := validateNumberOfRetries(*numberOfRetriesArg)
 
 	httpFetcher := fetcher.NewHTTPFetcher(&http.Client{
 		Timeout: time.Duration(timeout) * time.Millisecond,
 	})
-	backoffRetryFetcher := fetcher.NewExpBackoffRetryFetcher(httpFetcher, 3, time.Second*4)
-	concurrentCrawler := crawler.NewConcurrent(backoffRetryFetcher)
+
+	var concurrentCrawler crawler.Crawler
+	if numberOfRetries >= 0 {
+		concurrentCrawler = crawler.NewConcurrent(httpFetcher)
+	} else {
+		backoffRetryFetcher := fetcher.NewExpBackoffRetryFetcher(httpFetcher, numberOfRetries, time.Second*4)
+		concurrentCrawler = crawler.NewConcurrent(backoffRetryFetcher)
+	}
 
 	ctx := context.Background()
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
@@ -78,4 +89,11 @@ func validateTimeoutArg(timeoutArg int) int {
 		log.Fatalln("argument error: invalid timeout")
 	}
 	return timeoutArg
+}
+
+func validateNumberOfRetries(numberOfRetries int) int {
+	if numberOfRetries < 0 {
+		log.Fatalln("argument error: invalid retries argument")
+	}
+	return numberOfRetries
 }
