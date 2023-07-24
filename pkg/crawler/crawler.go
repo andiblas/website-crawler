@@ -13,7 +13,7 @@ import (
 )
 
 type Crawler interface {
-	Crawl(ctx context.Context, urlToCrawl url.URL) ([]string, error)
+	Crawl(ctx context.Context, urlToCrawl url.URL, depth int) ([]string, error)
 }
 
 type Concurrent struct {
@@ -30,12 +30,14 @@ func NewConcurrent(fetcher fetcher.Fetcher) *Concurrent {
 //	ctx := context.Background()
 //	u, err := url.Parse("https://test.com")
 //	linksFound, err := concurrent.Crawl(ctx, u)
-func (c *Concurrent) Crawl(ctx context.Context, urlToCrawl url.URL) ([]string, error) {
+func (c *Concurrent) Crawl(ctx context.Context, urlToCrawl url.URL, depth int) ([]string, error) {
 	finishCh := make(chan bool)
 	errorsCh := make(chan error)
 	visitedLinksMap := sync.Map{}
 
-	go crawlerWorker(linkextractor.Normalize(urlToCrawl), c.fetcher, &visitedLinksMap, errorsCh, finishCh)
+	normalizedUrl := linkextractor.Normalize(urlToCrawl)
+	relativeDepth := linkextractor.LinkDepth(normalizedUrl) + depth
+	go crawlerWorker(normalizedUrl, relativeDepth, c.fetcher, &visitedLinksMap, errorsCh, finishCh)
 
 	// listen for any errors that may occur while crawling in child crawlers
 	var crawlingErrors []error
@@ -68,7 +70,12 @@ func (c *Concurrent) Crawl(ctx context.Context, urlToCrawl url.URL) ([]string, e
 	return crawledLinks, nil
 }
 
-func crawlerWorker(urlToCrawl url.URL, fetcher fetcher.Fetcher, visitedLinksMap *sync.Map, errorsCh chan error, finishCh chan bool) {
+func crawlerWorker(urlToCrawl url.URL, depth int, fetcher fetcher.Fetcher, visitedLinksMap *sync.Map, errorsCh chan error, finishCh chan bool) {
+	if depth < linkextractor.LinkDepth(urlToCrawl) {
+		finishCh <- true
+		return
+	}
+
 	if _, loaded := visitedLinksMap.LoadOrStore(urlToCrawl.String(), true); loaded {
 		finishCh <- true
 		return
@@ -84,7 +91,7 @@ func crawlerWorker(urlToCrawl url.URL, fetcher fetcher.Fetcher, visitedLinksMap 
 
 	childFinishChannel := make(chan bool)
 	for _, link := range links {
-		go crawlerWorker(link, fetcher, visitedLinksMap, errorsCh, childFinishChannel)
+		go crawlerWorker(link, depth, fetcher, visitedLinksMap, errorsCh, childFinishChannel)
 	}
 
 	for i := 0; i < len(links); i++ {

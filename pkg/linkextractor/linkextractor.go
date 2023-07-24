@@ -30,6 +30,11 @@ func Normalize(urlToNormalize url.URL) url.URL {
 	}
 }
 
+func LinkDepth(urlArg url.URL) int {
+	paths := strings.Split(urlArg.Path, "/")
+	return len(paths) - 1
+}
+
 func searchDomainMatchingLinks(webpageURL url.URL, node *html.Node) []url.URL {
 	var links []url.URL
 	if node.Type == html.ElementNode && node.Data == "a" {
