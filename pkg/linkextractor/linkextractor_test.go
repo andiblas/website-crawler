@@ -47,7 +47,7 @@ func TestExtract(t *testing.T) {
 				webpageURL:     *testUrl,
 				webpageContent: io.NopCloser(strings.NewReader(htmlWithNoLinks)),
 			},
-			want:    nil,
+			want:    []url.URL{},
 			wantErr: false,
 		},
 		{

@@ -16,15 +16,10 @@ func Extract(webpageURL url.URL, webpageContent io.Reader) ([]url.URL, error) {
 		return nil, err
 	}
 
-	// I'm aware that the following links manipulation represents
-	// a O(3n) operation and could be improved. I opted with this
-	// approach since we are not going to deal with huge amounts
-	// of links and also for the sake of readability.
 	links := searchDomainMatchingLinks(webpageURL, parsedHtmlContent)
 	linksWithoutDuplicates := removeDuplicates(links)
-	normalizedLinks := normalizeLinks(webpageURL, linksWithoutDuplicates)
 
-	return normalizedLinks, nil
+	return linksWithoutDuplicates, nil
 }
 
 func Normalize(urlToNormalize url.URL) url.URL {
@@ -40,8 +35,13 @@ func searchDomainMatchingLinks(webpageURL url.URL, node *html.Node) []url.URL {
 	if node.Type == html.ElementNode && node.Data == "a" {
 		for _, attr := range node.Attr {
 			if attr.Key == "href" {
-				if parsedLink, matches := domainMatches(webpageURL, attr.Val); matches {
-					links = append(links, parsedLink)
+				hrefUrl, err := url.Parse(attr.Val)
+				if err != nil {
+					continue
+				}
+				normalizedLink := handleRelativeLink(webpageURL, Normalize(*hrefUrl))
+				if domainMatches(webpageURL, normalizedLink) {
+					links = append(links, normalizedLink)
 				}
 			}
 		}
@@ -68,16 +68,8 @@ func removeDuplicates(links []url.URL) []url.URL {
 	return uniqueSlice
 }
 
-func normalizeLinks(baseLink url.URL, links []url.URL) []url.URL {
-	var normalizedLinks []url.URL
-	for _, link := range links {
-		normalizedLinks = append(normalizedLinks, handleRelativeLink(baseLink, Normalize(link)))
-	}
-	return normalizedLinks
-}
-
 func handleRelativeLink(baseLink url.URL, relativeLink url.URL) url.URL {
-	if relativeLink.Host == "" {
+	if relativeLink.Host == "" || relativeLink.Scheme == "" {
 		return url.URL{
 			Scheme: baseLink.Scheme,
 			Host:   baseLink.Host,
@@ -87,12 +79,6 @@ func handleRelativeLink(baseLink url.URL, relativeLink url.URL) url.URL {
 	return relativeLink
 }
 
-func domainMatches(webpageURL url.URL, hrefValue string) (url.URL, bool) {
-	hrefUrl, err := url.Parse(hrefValue)
-	if err != nil {
-		return url.URL{}, false
-	}
-	normalizedUrl := Normalize(*hrefUrl)
-
-	return *hrefUrl, webpageURL.Host == normalizedUrl.Host || normalizedUrl.Host == ""
+func domainMatches(webpageURL url.URL, hrefValue url.URL) bool {
+	return webpageURL.Host == hrefValue.Host || hrefValue.Host == ""
 }
