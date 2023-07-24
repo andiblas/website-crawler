@@ -148,3 +148,42 @@ func TestNormalize(t *testing.T) {
 		})
 	}
 }
+
+func TestLinkDepth(t *testing.T) {
+	type args struct {
+		urlArg url.URL
+	}
+	tests := []struct {
+		name string
+		args args
+		want int
+	}{
+		{
+			name: "single path",
+			args: args{urlArg: tryParse("https://test.com")},
+			want: 0,
+		},
+		{
+			name: "double path",
+			args: args{urlArg: tryParse("https://test.com/contact")},
+			want: 1,
+		},
+		{
+			name: "triple path",
+			args: args{urlArg: tryParse("https://test.com/blog/entry")},
+			want: 2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := LinkDepth(tt.args.urlArg); got != tt.want {
+				t.Errorf("LinkDepth() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func tryParse(urlToParse string) url.URL {
+	parse, _ := url.Parse(urlToParse)
+	return *parse
+}
