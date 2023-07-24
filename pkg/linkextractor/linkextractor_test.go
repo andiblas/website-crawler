@@ -13,6 +13,7 @@ const (
 	htmlWithNoLinks                 = `<body><p>I have no links</p></body>`
 	htmlWithRepeatedLinks           = `<a href="https://test.com"/><a href="https://google.com"/><a href="https://test.com"/>`
 	htmlWithLinksWithoutNormalizing = `<a href="https://test.com"/><a href="https://www.test.com/contact"/>`
+	htmlWithRelativeLinks           = `<a href="https://test.com"/><a href="/contact"/>`
 )
 
 func TestExtract(t *testing.T) {
@@ -65,6 +66,18 @@ func TestExtract(t *testing.T) {
 			args: args{
 				webpageURL:     *testUrl,
 				webpageContent: io.NopCloser(strings.NewReader(htmlWithLinksWithoutNormalizing)),
+			},
+			want: []url.URL{
+				*assertUrl,
+				*assertUrl2,
+			},
+			wantErr: false,
+		},
+		{
+			name: "extracts relative links",
+			args: args{
+				webpageURL:     *testUrl,
+				webpageContent: io.NopCloser(strings.NewReader(htmlWithRelativeLinks)),
 			},
 			want: []url.URL{
 				*assertUrl,

@@ -22,7 +22,7 @@ func Extract(webpageURL url.URL, webpageContent io.Reader) ([]url.URL, error) {
 	// of links and also for the sake of readability.
 	links := searchDomainMatchingLinks(webpageURL, parsedHtmlContent)
 	linksWithoutDuplicates := removeDuplicates(links)
-	normalizedLinks := normalizeLinks(linksWithoutDuplicates)
+	normalizedLinks := normalizeLinks(webpageURL, linksWithoutDuplicates)
 
 	return normalizedLinks, nil
 }
@@ -68,12 +68,23 @@ func removeDuplicates(links []url.URL) []url.URL {
 	return uniqueSlice
 }
 
-func normalizeLinks(links []url.URL) []url.URL {
+func normalizeLinks(baseLink url.URL, links []url.URL) []url.URL {
 	var normalizedLinks []url.URL
 	for _, link := range links {
-		normalizedLinks = append(normalizedLinks, Normalize(link))
+		normalizedLinks = append(normalizedLinks, handleRelativeLink(baseLink, Normalize(link)))
 	}
 	return normalizedLinks
+}
+
+func handleRelativeLink(baseLink url.URL, relativeLink url.URL) url.URL {
+	if relativeLink.Host == "" {
+		return url.URL{
+			Scheme: baseLink.Scheme,
+			Host:   baseLink.Host,
+			Path:   relativeLink.Path,
+		}
+	}
+	return relativeLink
 }
 
 func domainMatches(webpageURL url.URL, hrefValue string) (url.URL, bool) {
