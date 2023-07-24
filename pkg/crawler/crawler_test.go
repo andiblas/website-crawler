@@ -2,7 +2,9 @@ package crawler
 
 import (
 	"errors"
+	"io"
 	"net/url"
+	"strings"
 	"testing"
 
 	"golang.org/x/net/context"
@@ -16,12 +18,12 @@ const (
 )
 
 type mockFetcher struct {
-	webpageContent string
-	throwError     error
+	webpageReader io.ReadCloser
+	throwError    error
 }
 
-func (m mockFetcher) FetchWebpageContent(_ url.URL) (string, error) {
-	return m.webpageContent, m.throwError
+func (m mockFetcher) FetchWebpageContent(_ url.URL) (io.ReadCloser, error) {
+	return m.webpageReader, m.throwError
 }
 
 func TestConcurrent_Crawl(t *testing.T) {
@@ -43,8 +45,8 @@ func TestConcurrent_Crawl(t *testing.T) {
 		{
 			name: "crawls a page with a single link and returns it",
 			fields: fields{fetcher: mockFetcher{
-				webpageContent: htmlWithSingleLink,
-				throwError:     nil,
+				webpageReader: io.NopCloser(strings.NewReader(htmlWithSingleLink)),
+				throwError:    nil,
 			}},
 			args: args{
 				ctx:        context.Background(),
@@ -58,8 +60,8 @@ func TestConcurrent_Crawl(t *testing.T) {
 		{
 			name: "crawls a page with three links and returns them",
 			fields: fields{fetcher: mockFetcher{
-				webpageContent: htmlWithThreeLinks,
-				throwError:     nil,
+				webpageReader: io.NopCloser(strings.NewReader(htmlWithThreeLinks)),
+				throwError:    nil,
 			}},
 			args: args{
 				ctx:        context.Background(),
@@ -75,8 +77,8 @@ func TestConcurrent_Crawl(t *testing.T) {
 		{
 			name: "crawls a page returns an error",
 			fields: fields{fetcher: mockFetcher{
-				webpageContent: "",
-				throwError:     errors.New("error"),
+				webpageReader: nil,
+				throwError:    errors.New("error"),
 			}},
 			args: args{
 				ctx:        context.Background(),

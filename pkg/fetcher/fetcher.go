@@ -8,7 +8,7 @@ import (
 )
 
 type Fetcher interface {
-	FetchWebpageContent(url url.URL) (string, error)
+	FetchWebpageContent(url url.URL) (io.ReadCloser, error)
 }
 
 type httpGetter interface {
@@ -36,25 +36,20 @@ func NewHTTPFetcher(httpClient httpGetter) *HTTPFetcher {
 // FetchWebpageContent fetches the content of a webpage specified by the given URL using an HTTP GET request.
 // It uses the HTTP client provided in the HTTPFetcher and returns the content as a string.
 // The method returns an error if the HTTP request fails or if there is an error reading the response body.
-func (f *HTTPFetcher) FetchWebpageContent(url url.URL) (string, error) {
+func (f *HTTPFetcher) FetchWebpageContent(url url.URL) (io.ReadCloser, error) {
 	res, err := f.httpClient.Get(url.String())
 	if err != nil {
-		return "", err
-	}
-	content, err := io.ReadAll(res.Body)
-	defer res.Body.Close()
-	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return string(content), nil
+	return res.Body, nil
 }
 
 // FetchWebpageContent fetches the content of a webpage specified by the given URL using an exponential backoff retry strategy.
 // It uses the innerFetcher to perform the actual fetch operation and retries fetching up to the specified number of times.
 // The method returns the webpage content as a string and nil for the error if the fetch is successful.
 // If the fetch encounters errors on all retries, the last encountered error is returned.
-func (r *ExpBackoffRetryFetcher) FetchWebpageContent(url url.URL) (string, error) {
+func (r *ExpBackoffRetryFetcher) FetchWebpageContent(url url.URL) (io.ReadCloser, error) {
 	var lastError error
 	for i := 1; i <= r.numberOfRetries; i++ {
 		webpageContent, err := r.innerFetcher.FetchWebpageContent(url)
@@ -65,5 +60,5 @@ func (r *ExpBackoffRetryFetcher) FetchWebpageContent(url url.URL) (string, error
 		}
 		return webpageContent, nil
 	}
-	return "", lastError
+	return nil, lastError
 }

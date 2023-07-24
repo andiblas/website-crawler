@@ -1,8 +1,10 @@
 package linkextractor
 
 import (
+	"io"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -19,7 +21,7 @@ func TestExtract(t *testing.T) {
 	assertUrl2, _ := url.Parse("https://test.com/contact")
 	type args struct {
 		webpageURL     url.URL
-		webpageContent string
+		webpageContent io.ReadCloser
 	}
 	tests := []struct {
 		name    string
@@ -31,7 +33,7 @@ func TestExtract(t *testing.T) {
 			name: "extracts links from same domain from html that has links",
 			args: args{
 				webpageURL:     *testUrl,
-				webpageContent: htmlWithLinks,
+				webpageContent: io.NopCloser(strings.NewReader(htmlWithLinks)),
 			},
 			want: []url.URL{
 				*assertUrl,
@@ -42,7 +44,7 @@ func TestExtract(t *testing.T) {
 			name: "extracts no links from a link-less html",
 			args: args{
 				webpageURL:     *testUrl,
-				webpageContent: htmlWithNoLinks,
+				webpageContent: io.NopCloser(strings.NewReader(htmlWithNoLinks)),
 			},
 			want:    nil,
 			wantErr: false,
@@ -51,7 +53,7 @@ func TestExtract(t *testing.T) {
 			name: "extracts links without repeating",
 			args: args{
 				webpageURL:     *testUrl,
-				webpageContent: htmlWithRepeatedLinks,
+				webpageContent: io.NopCloser(strings.NewReader(htmlWithRepeatedLinks)),
 			},
 			want: []url.URL{
 				*assertUrl,
@@ -62,7 +64,7 @@ func TestExtract(t *testing.T) {
 			name: "extracts links that are not normalized",
 			args: args{
 				webpageURL:     *testUrl,
-				webpageContent: htmlWithLinksWithoutNormalizing,
+				webpageContent: io.NopCloser(strings.NewReader(htmlWithLinksWithoutNormalizing)),
 			},
 			want: []url.URL{
 				*assertUrl,

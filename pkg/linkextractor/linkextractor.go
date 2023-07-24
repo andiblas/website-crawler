@@ -1,6 +1,7 @@
 package linkextractor
 
 import (
+	"io"
 	"net/url"
 	"strings"
 
@@ -9,8 +10,8 @@ import (
 
 // Extract extracts URLs from the given webpage content and returns a slice of normalized URLs.
 // The function parses the HTML content of the webpage and searches for links within the same domain as the provided webpageURL.
-func Extract(webpageURL url.URL, webpageContent string) ([]url.URL, error) {
-	parsedHtmlContent, err := html.Parse(strings.NewReader(webpageContent))
+func Extract(webpageURL url.URL, webpageContent io.Reader) ([]url.URL, error) {
+	parsedHtmlContent, err := html.Parse(webpageContent)
 	if err != nil {
 		return nil, err
 	}
@@ -80,6 +81,7 @@ func domainMatches(webpageURL url.URL, hrefValue string) (url.URL, bool) {
 	if err != nil {
 		return url.URL{}, false
 	}
+	normalizedUrl := Normalize(*hrefUrl)
 
-	return *hrefUrl, webpageURL.Host == Normalize(*hrefUrl).Host
+	return *hrefUrl, webpageURL.Host == normalizedUrl.Host || normalizedUrl.Host == ""
 }

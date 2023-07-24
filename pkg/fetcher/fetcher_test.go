@@ -29,11 +29,15 @@ func TestHTTPFetcher_FetchWebpageContent(t *testing.T) {
 			webpageContent: mockWebpageContent,
 			throwError:     nil,
 		})
-		webpageContent, err := httpFetcher.FetchWebpageContent(url.URL{})
+		reader, err := httpFetcher.FetchWebpageContent(url.URL{})
 		if err != nil {
 			t.Errorf("should not throw error at httpFetcher.FetchWebpageContent for mocked httpgetter. err: %v", err)
 		}
-		if !reflect.DeepEqual(webpageContent, mockWebpageContent) {
+		webpageContent, err := io.ReadAll(reader)
+		if err != nil {
+			t.Errorf("should not throw error at io.ReadAll for mocked httpgetter. err: %v", err)
+		}
+		if !reflect.DeepEqual(string(webpageContent), mockWebpageContent) {
 			t.Errorf("Extract() got = %v, want %v", webpageContent, mockWebpageContent)
 		}
 	})
@@ -55,12 +59,12 @@ type mockRetryFetcher struct {
 	currentRetry          int
 }
 
-func (m *mockRetryFetcher) FetchWebpageContent(_ url.URL) (string, error) {
+func (m *mockRetryFetcher) FetchWebpageContent(url url.URL) (io.ReadCloser, error) {
 	if m.numberOfRetriesToWork == m.currentRetry {
-		return "", nil
+		return nil, nil
 	}
 	m.currentRetry++
-	return "", errors.New("error")
+	return nil, errors.New("error")
 }
 
 func TestExpBackoffRetryFetcher_FetchWebpageContent(t *testing.T) {
