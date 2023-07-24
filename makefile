@@ -1,6 +1,6 @@
-URL_PARAMETER=""
-TIMEOUT_PARAMETER=""
-RETRIES_PARAMETER=""
+URL_PARAMETER=
+TIMEOUT_PARAMETER=
+RETRIES_PARAMETER=
 
 ifneq ($(URL),)
 	URL_PARAMETER=--url $(URL)
@@ -16,7 +16,6 @@ endif
 
 build_and_run:
 	go build ./cmd/crawler
-
 	./crawler $(URL_PARAMETER) $(TIMEOUT_PARAMETER) $(RETRIES_PARAMETER)
 
 tests:
