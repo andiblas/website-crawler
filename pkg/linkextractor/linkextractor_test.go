@@ -14,6 +14,7 @@ const (
 	htmlWithRepeatedLinks           = `<a href="https://test.com"/><a href="https://google.com"/><a href="https://test.com"/>`
 	htmlWithLinksWithoutNormalizing = `<a href="https://test.com"/><a href="https://www.test.com/contact"/>`
 	htmlWithRelativeLinks           = `<a href="https://test.com"/><a href="/contact"/>`
+	htmlWithMailtoLinks             = `<a href="https://test.com"/><a href="mailto://test.com/contact"/>`
 )
 
 func TestExtract(t *testing.T) {
@@ -82,6 +83,17 @@ func TestExtract(t *testing.T) {
 			want: []url.URL{
 				*assertUrl,
 				*assertUrl2,
+			},
+			wantErr: false,
+		},
+		{
+			name: "ignores non http/https links",
+			args: args{
+				webpageURL:     *testUrl,
+				webpageContent: io.NopCloser(strings.NewReader(htmlWithMailtoLinks)),
+			},
+			want: []url.URL{
+				*assertUrl,
 			},
 			wantErr: false,
 		},

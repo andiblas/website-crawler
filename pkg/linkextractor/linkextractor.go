@@ -40,7 +40,7 @@ func searchDomainMatchingLinks(webpageURL url.URL, node *html.Node) []url.URL {
 					continue
 				}
 				normalizedLink := handleRelativeLink(webpageURL, Normalize(*hrefUrl))
-				if domainMatches(webpageURL, normalizedLink) {
+				if isValidLink(webpageURL, normalizedLink) {
 					links = append(links, normalizedLink)
 				}
 			}
@@ -79,6 +79,7 @@ func handleRelativeLink(baseLink url.URL, relativeLink url.URL) url.URL {
 	return relativeLink
 }
 
-func domainMatches(webpageURL url.URL, hrefValue url.URL) bool {
-	return webpageURL.Host == hrefValue.Host || hrefValue.Host == ""
+func isValidLink(webpageURL url.URL, hrefValue url.URL) bool {
+	return (webpageURL.Host == hrefValue.Host || hrefValue.Host == "") &&
+		(hrefValue.Scheme == "http" || hrefValue.Scheme == "https")
 }
