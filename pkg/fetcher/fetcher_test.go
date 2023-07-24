@@ -59,7 +59,7 @@ type mockRetryFetcher struct {
 	currentRetry          int
 }
 
-func (m *mockRetryFetcher) FetchWebpageContent(url url.URL) (io.ReadCloser, error) {
+func (m *mockRetryFetcher) FetchWebpageContent(_ url.URL) (io.ReadCloser, error) {
 	if m.numberOfRetriesToWork == m.currentRetry {
 		return nil, nil
 	}
