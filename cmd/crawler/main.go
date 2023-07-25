@@ -42,11 +42,11 @@ func main() {
 	})
 
 	var concurrentCrawler crawler.Crawler
-	if numberOfRetries >= 0 {
-		concurrentCrawler = crawler.NewConcurrent(httpFetcher)
-	} else {
+	if numberOfRetries > 0 {
 		backoffRetryFetcher := fetcher.NewExpBackoffRetryFetcher(httpFetcher, numberOfRetries, time.Second*4)
 		concurrentCrawler = crawler.NewConcurrent(backoffRetryFetcher)
+	} else {
+		concurrentCrawler = crawler.NewConcurrent(httpFetcher)
 	}
 
 	ctx := context.Background()
