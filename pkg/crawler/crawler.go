@@ -26,10 +26,11 @@ func NewConcurrent(fetcher fetcher.Fetcher) *Concurrent {
 
 // Crawl crawls a URL and returns a list of crawled links and any errors encountered.
 // It uses a Concurrent crawler to crawl the URL and its linked pages concurrently.
+// The depth argument determines the path depth to crawl relative to the provided url.
 //
 //	ctx := context.Background()
 //	u, err := url.Parse("https://test.com")
-//	linksFound, err := concurrent.Crawl(ctx, u)
+//	linksFound, err := concurrent.Crawl(ctx, u, 2)
 func (c *Concurrent) Crawl(ctx context.Context, urlToCrawl url.URL, depth int) ([]string, error) {
 	finishCh := make(chan bool)
 	errorsCh := make(chan error)
