@@ -29,6 +29,8 @@ func (m mockFetcher) FetchWebpageContent(_ url.URL) (io.ReadCloser, error) {
 }
 
 func TestConcurrent_Crawl(t *testing.T) {
+	canceledCtx, cancelFunc := context.WithCancel(context.Background())
+	cancelFunc()
 	testUrl, _ := url.Parse("https://test.com")
 	type fields struct {
 		fetcher fetcher.Fetcher
@@ -143,12 +145,24 @@ func TestConcurrent_Crawl(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "crawls gets interrupted",
+			fields: fields{fetcher: mockFetcher{
+				webpageReader: io.NopCloser(strings.NewReader(htmlWithSingleLink)),
+				throwError:    nil,
+			}},
+			args: args{
+				ctx:        canceledCtx,
+				urlToCrawl: *testUrl,
+				pathDepth:  2,
+			},
+			want:    map[string]bool{},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &Concurrent{
-				fetcher: tt.fields.fetcher,
-			}
+			c := NewConcurrent(tt.fields.fetcher)
 			got, err := c.Crawl(tt.args.ctx, tt.args.urlToCrawl, tt.args.pathDepth)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Crawl() error = %v, wantErr %v", err, tt.wantErr)
