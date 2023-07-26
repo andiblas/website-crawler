@@ -26,9 +26,9 @@ make URL=https://parserdigital.com
 
 #### Arguments
 - `URL` URL to crawl
-- `path_depth` The path depth from the starting URL that you want to crawl. Must be greater than 0.
-- `timeout` Request timeout used to get webpages in milliseconds. Must be greater than 0.
-- `retries` The number of retries the crawler will try to fetch a page in case of errors. Must be 0 or greater than 0.
+- `PATH_DEPTH` The path depth from the starting URL that you want to crawl. Must be greater than 0.
+- `TIMEOUT` Request timeout used to get webpages in milliseconds. Must be greater than 0.
+- `RETRIES` The number of retries the crawler will try to fetch a page in case of errors. Must be 0 or greater than 0.
 
 ### Run tests
 ```shell
