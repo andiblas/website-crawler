@@ -60,19 +60,19 @@ func main() {
 		cancelFunc()
 	}()
 
-	crawledLinks, err := concurrentCrawler.Crawl(cancelCtx, parsedUrl, recursionLimit)
+	linkCount := 0
+	onNewLinkFound := func(link url.URL) {
+		linkCount++
+		fmt.Printf("[LINK %04d]\t%s\n", linkCount, link.String())
+	}
+
+	// you can use the full crawling result set once finished
+	_, err := concurrentCrawler.Crawl(cancelCtx, parsedUrl, recursionLimit, onNewLinkFound)
 	if err != nil {
 		fmt.Printf("%v\n", err)
 	}
 
-	printResults(crawledLinks)
-}
-
-func printResults(crawledLinks []string) {
-	fmt.Printf("[RESULTS] Links found: %d\n", len(crawledLinks))
-	for index, crawledLink := range crawledLinks {
-		fmt.Printf("[Link #%d] %s\n", index, crawledLink)
-	}
+	fmt.Printf("Total links found: %d\n", linkCount)
 }
 
 func validateUrlToCrawl(urlToCrawlArg string) url.URL {

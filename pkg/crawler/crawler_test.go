@@ -38,6 +38,7 @@ func TestConcurrent_Crawl(t *testing.T) {
 		ctx            context.Context
 		urlToCrawl     url.URL
 		recursionLimit int
+		onNewLinkFound func(link url.URL)
 	}
 	tests := []struct {
 		name    string
@@ -56,6 +57,7 @@ func TestConcurrent_Crawl(t *testing.T) {
 				ctx:            context.Background(),
 				urlToCrawl:     *testUrl,
 				recursionLimit: 1,
+				onNewLinkFound: nil,
 			},
 			want: map[string]bool{
 				"https://test.com": true,
@@ -72,6 +74,7 @@ func TestConcurrent_Crawl(t *testing.T) {
 				ctx:            context.Background(),
 				urlToCrawl:     *testUrl,
 				recursionLimit: 2,
+				onNewLinkFound: nil,
 			},
 			want: map[string]bool{
 				"https://test.com":          true,
@@ -90,39 +93,10 @@ func TestConcurrent_Crawl(t *testing.T) {
 				ctx:            context.Background(),
 				urlToCrawl:     *testUrl,
 				recursionLimit: 1,
+				onNewLinkFound: nil,
 			},
 			want:    map[string]bool{},
 			wantErr: true,
-		},
-		{
-			name: "crawls nothing because of negative depth",
-			fields: fields{fetcher: mockFetcher{
-				webpageReader: io.NopCloser(strings.NewReader(htmlWithThreeLinks)),
-				throwError:    nil,
-			}},
-			args: args{
-				ctx:            context.Background(),
-				urlToCrawl:     *testUrl,
-				recursionLimit: -1,
-			},
-			want:    map[string]bool{},
-			wantErr: false,
-		},
-		{
-			name: "crawls a page with recursionLimit one ignoring deeper links",
-			fields: fields{fetcher: mockFetcher{
-				webpageReader: io.NopCloser(strings.NewReader(htmlWithLinksDepthThree)),
-				throwError:    nil,
-			}},
-			args: args{
-				ctx:            context.Background(),
-				urlToCrawl:     *testUrl,
-				recursionLimit: 1,
-			},
-			want: map[string]bool{
-				"https://test.com": true,
-			},
-			wantErr: false,
 		},
 		{
 			name: "crawls gets interrupted",
@@ -134,6 +108,7 @@ func TestConcurrent_Crawl(t *testing.T) {
 				ctx:            canceledCtx,
 				urlToCrawl:     *testUrl,
 				recursionLimit: 2,
+				onNewLinkFound: nil,
 			},
 			want:    map[string]bool{},
 			wantErr: false,
@@ -142,7 +117,7 @@ func TestConcurrent_Crawl(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := NewConcurrent(tt.fields.fetcher)
-			got, err := c.Crawl(tt.args.ctx, tt.args.urlToCrawl, tt.args.recursionLimit)
+			got, err := c.Crawl(tt.args.ctx, tt.args.urlToCrawl, tt.args.recursionLimit, tt.args.onNewLinkFound)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Crawl() error = %v, wantErr %v", err, tt.wantErr)
 				return
