@@ -54,7 +54,7 @@ func (c *Concurrent) Crawl(ctx context.Context, urlToCrawl url.URL, recursionLim
 	}
 
 	for _, err := range crawlingErrors {
-		fmt.Printf("error occured while crawling: %+v\n", err)
+		fmt.Println(err)
 	}
 
 	var crawledLinks []string
@@ -88,7 +88,7 @@ func crawlerWorker(urlToCrawl url.URL, recursionLimit int, onNewLinkFound func(l
 	links, err := crawlWebpage(fetcher, urlToCrawl)
 	if err != nil {
 		visitedLinksMap.Delete(urlToCrawl.String())
-		errorsCh <- err
+		errorsCh <- fmt.Errorf("error while crawling [%s]: %w", urlToCrawl.String(), err)
 		finishCh <- true
 		return
 	}
