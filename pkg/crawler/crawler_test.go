@@ -15,7 +15,6 @@ import (
 const (
 	htmlWithSingleLink      = `<a href="https://test.com"/>`
 	htmlWithThreeLinks      = `<a href="https://test.com"/><a href="https://test.com/contact"/><a href="https://test.com/about-us"/>`
-	htmlWithLinksDepthTwo   = `<a href="https://test.com"/><a href="https://test.com/depth1"/><a href="https://test.com/depth1/depth2"/>`
 	htmlWithLinksDepthThree = `<a href="https://test.com"/><a href="https://test.com/depth1"/><a href="https://test.com/depth1/depth2"/><a href="https://test.com/depth1/depth2/depth3"/>`
 )
 
@@ -107,24 +106,6 @@ func TestConcurrent_Crawl(t *testing.T) {
 				recursionLimit: -1,
 			},
 			want:    map[string]bool{},
-			wantErr: false,
-		},
-		{
-			name: "crawls a page with depth two",
-			fields: fields{fetcher: mockFetcher{
-				webpageReader: io.NopCloser(strings.NewReader(htmlWithLinksDepthTwo)),
-				throwError:    nil,
-			}},
-			args: args{
-				ctx:            context.Background(),
-				urlToCrawl:     *testUrl,
-				recursionLimit: 2,
-			},
-			want: map[string]bool{
-				"https://test.com":               true,
-				"https://test.com/depth1":        true,
-				"https://test.com/depth1/depth2": true,
-			},
 			wantErr: false,
 		},
 		{

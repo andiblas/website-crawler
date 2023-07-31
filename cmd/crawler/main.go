@@ -19,14 +19,14 @@ import (
 )
 
 const (
-	defaultPathDepth       = 2
+	defaultRecursionLimit  = 4
 	defaultTimeout         = 15000
 	defaultNumberOfRetries = 3
 )
 
 func main() {
 	urlToCrawlArg := flag.String("url", "", "URL to crawl.")
-	recursionLimitArg := flag.Int("recursion_limit", defaultPathDepth, "Sets the amount of times the crawler will continue crawling in links found in a page. Must be greater than 0.")
+	recursionLimitArg := flag.Int("recursion_limit", defaultRecursionLimit, "Sets the amount of times the crawler will continue crawling on links found in a page. Must be greater than 0.")
 	timeoutArg := flag.Int("timeout", defaultTimeout, "Please set the timeout in milliseconds. Must be greater than 0.")
 	numberOfRetriesArg := flag.Int("retries", defaultNumberOfRetries, "Set the number of retries the crawler will try to fetch a page in case of errors. Must be 0 or greater than 0.")
 
@@ -76,34 +76,35 @@ func printResults(crawledLinks []string) {
 }
 
 func validateUrlToCrawl(urlToCrawlArg string) url.URL {
+	errMessage := "argument error: invalid URL to crawl. example: --url=https://example.com"
 	if strings.TrimSpace(urlToCrawlArg) == "" {
-		log.Fatalln("argument error: invalid URL to crawl")
+		log.Fatalln(errMessage)
 	}
 
 	parsedUrl, err := url.Parse(urlToCrawlArg)
 	if err != nil {
-		log.Fatalln("argument error: invalid URL to crawl")
+		log.Fatalln(errMessage)
 	}
 	return *parsedUrl
 }
 
 func validateRecursionLimit(recursionLimitArg int) int {
 	if recursionLimitArg <= 0 {
-		log.Fatalln("argument error: invalid recursion limit. must be greater than 0")
+		log.Fatalln("argument error: invalid recursion limit. must be greater than 0. example: --recursion_limit=2")
 	}
 	return recursionLimitArg
 }
 
 func validateTimeoutArg(timeoutArg int) int {
 	if timeoutArg <= 0 {
-		log.Fatalln("argument error: invalid timeout")
+		log.Fatalln("argument error: invalid timeout. example: --timeout=5000")
 	}
 	return timeoutArg
 }
 
 func validateNumberOfRetries(numberOfRetries int) int {
 	if numberOfRetries < 0 {
-		log.Fatalln("argument error: invalid retries argument")
+		log.Fatalln("argument error: invalid retries argument. example: --retries=2")
 	}
 	return numberOfRetries
 }
