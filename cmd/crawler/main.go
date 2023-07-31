@@ -26,14 +26,14 @@ const (
 
 func main() {
 	urlToCrawlArg := flag.String("url", "", "URL to crawl.")
-	pathDepthArg := flag.Int("path_depth", defaultPathDepth, "The path depth from the starting URL that you want to crawl. Must be greater than 0.")
+	recursionLimitArg := flag.Int("recursion_limit", defaultPathDepth, "Sets the amount of times the crawler will continue crawling in links found in a page. Must be greater than 0.")
 	timeoutArg := flag.Int("timeout", defaultTimeout, "Please set the timeout in milliseconds. Must be greater than 0.")
 	numberOfRetriesArg := flag.Int("retries", defaultNumberOfRetries, "Set the number of retries the crawler will try to fetch a page in case of errors. Must be 0 or greater than 0.")
 
 	flag.Parse()
 
 	timeout := validateTimeoutArg(*timeoutArg)
-	pathDepth := validatePathDepth(*pathDepthArg)
+	recursionLimit := validateRecursionLimit(*recursionLimitArg)
 	parsedUrl := validateUrlToCrawl(*urlToCrawlArg)
 	numberOfRetries := validateNumberOfRetries(*numberOfRetriesArg)
 
@@ -60,7 +60,7 @@ func main() {
 		cancelFunc()
 	}()
 
-	crawledLinks, err := concurrentCrawler.Crawl(cancelCtx, parsedUrl, pathDepth)
+	crawledLinks, err := concurrentCrawler.Crawl(cancelCtx, parsedUrl, recursionLimit)
 	if err != nil {
 		fmt.Printf("%v\n", err)
 	}
@@ -87,11 +87,11 @@ func validateUrlToCrawl(urlToCrawlArg string) url.URL {
 	return *parsedUrl
 }
 
-func validatePathDepth(pathDepthArg int) int {
-	if pathDepthArg <= 0 {
-		log.Fatalln("argument error: invalid path depth")
+func validateRecursionLimit(recursionLimitArg int) int {
+	if recursionLimitArg <= 0 {
+		log.Fatalln("argument error: invalid recursion limit. must be greater than 0")
 	}
-	return pathDepthArg
+	return recursionLimitArg
 }
 
 func validateTimeoutArg(timeoutArg int) int {

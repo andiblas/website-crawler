@@ -32,13 +32,6 @@ func Normalize(urlToNormalize url.URL) url.URL {
 	}
 }
 
-// LinkDepth calculates the depth of a given URL based on its path components.
-// The depth is the number of path components (segments) in the URLs path.
-func LinkDepth(urlArg url.URL) int {
-	paths := strings.Split(urlArg.Path, "/")
-	return len(paths) - 1
-}
-
 func searchDomainMatchingLinks(webpageURL url.URL, node *html.Node) []url.URL {
 	var links []url.URL
 	if node.Type == html.ElementNode && node.Data == "a" {

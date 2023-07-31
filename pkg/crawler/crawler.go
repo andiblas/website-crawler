@@ -13,7 +13,7 @@ import (
 )
 
 type Crawler interface {
-	Crawl(ctx context.Context, urlToCrawl url.URL, depth int) ([]string, error)
+	Crawl(ctx context.Context, urlToCrawl url.URL, recursionLimit int) ([]string, error)
 }
 
 type Concurrent struct {
@@ -26,19 +26,18 @@ func NewConcurrent(fetcher fetcher.Fetcher) *Concurrent {
 
 // Crawl crawls a URL and returns a list of crawled links and any errors encountered.
 // It uses a Concurrent crawler to crawl the URL and its linked pages concurrently.
-// The depth argument determines the path depth to crawl relative to the provided url.
+// The recursionLimit argument how deep the crawler will continue retrieving links found in pages.
 //
 //	ctx := context.Background()
 //	u, err := url.Parse("https://test.com")
 //	linksFound, err := concurrent.Crawl(ctx, u, 2)
-func (c *Concurrent) Crawl(ctx context.Context, urlToCrawl url.URL, depth int) ([]string, error) {
+func (c *Concurrent) Crawl(ctx context.Context, urlToCrawl url.URL, recursionLimit int) ([]string, error) {
 	finishCh := make(chan bool)
 	errorsCh := make(chan error)
 	visitedLinksMap := sync.Map{}
 
 	normalizedUrl := linkextractor.Normalize(urlToCrawl)
-	relativeDepth := linkextractor.LinkDepth(normalizedUrl) + depth
-	go crawlerWorker(normalizedUrl, relativeDepth, c.fetcher, &visitedLinksMap, errorsCh, finishCh)
+	go crawlerWorker(normalizedUrl, recursionLimit, c.fetcher, &visitedLinksMap, errorsCh, finishCh)
 
 	// listen for any errors that may occur while crawling in child crawlers
 	var crawlingErrors []error
@@ -71,8 +70,8 @@ func (c *Concurrent) Crawl(ctx context.Context, urlToCrawl url.URL, depth int) (
 	return crawledLinks, nil
 }
 
-func crawlerWorker(urlToCrawl url.URL, depth int, fetcher fetcher.Fetcher, visitedLinksMap *sync.Map, errorsCh chan error, finishCh chan bool) {
-	if depth < linkextractor.LinkDepth(urlToCrawl) {
+func crawlerWorker(urlToCrawl url.URL, recursionLimit int, fetcher fetcher.Fetcher, visitedLinksMap *sync.Map, errorsCh chan error, finishCh chan bool) {
+	if recursionLimit <= 0 {
 		finishCh <- true
 		return
 	}
@@ -92,7 +91,7 @@ func crawlerWorker(urlToCrawl url.URL, depth int, fetcher fetcher.Fetcher, visit
 
 	childFinishChannel := make(chan bool)
 	for _, link := range links {
-		go crawlerWorker(link, depth, fetcher, visitedLinksMap, errorsCh, childFinishChannel)
+		go crawlerWorker(link, recursionLimit-1, fetcher, visitedLinksMap, errorsCh, childFinishChannel)
 	}
 
 	for i := 0; i < len(links); i++ {

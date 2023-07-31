@@ -26,9 +26,7 @@ make URL=https://parserdigital.com
 
 #### Arguments
 - `URL` URL to crawl
-- `PATH_DEPTH` The path depth from the starting URL that you want to crawl. Must be greater than 0.
-This means that if the requested url to crawl is https://test.com and path depth is 2, the crawler will crawl links up to two path segments like https://test.com/contact and https://test.com/blog/entry.
-
+- `RECURSION_LIMIT` Sets the amount of times the crawler will continue crawling in links found in a page. Must be greater than 0.
 - `TIMEOUT` Request timeout used to get webpages in milliseconds. Must be greater than 0.
 - `RETRIES` The number of retries the crawler will try to fetch a page in case of errors. Must be 0 or greater than 0.
 
