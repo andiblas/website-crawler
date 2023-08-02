@@ -26,14 +26,14 @@ const (
 
 func main() {
 	urlToCrawlArg := flag.String("url", "", "URL to crawl.")
-	recursionLimitArg := flag.Int("recursion_limit", defaultRecursionLimit, "Sets the amount of times the crawler will continue crawling on links found in a page. Must be greater than 0.")
+	//recursionLimitArg := flag.Int("recursion_limit", defaultRecursionLimit, "Sets the amount of times the crawler will continue crawling on links found in a page. Must be greater than 0.")
 	timeoutArg := flag.Int("timeout", defaultTimeout, "Please set the timeout in milliseconds. Must be greater than 0.")
 	numberOfRetriesArg := flag.Int("retries", defaultNumberOfRetries, "Set the number of retries the crawler will try to fetch a page in case of errors. Must be 0 or greater than 0.")
 
 	flag.Parse()
 
 	timeout := validateTimeoutArg(*timeoutArg)
-	recursionLimit := validateRecursionLimit(*recursionLimitArg)
+	//recursionLimit := validateRecursionLimit(*recursionLimitArg)
 	parsedUrl := validateUrlToCrawl(*urlToCrawlArg)
 	numberOfRetries := validateNumberOfRetries(*numberOfRetriesArg)
 
@@ -41,13 +41,13 @@ func main() {
 		Timeout: time.Duration(timeout) * time.Millisecond,
 	})
 
-	var concurrentCrawler crawler.Crawler
-	if numberOfRetries > 0 {
-		backoffRetryFetcher := fetcher.NewExpBackoffRetryFetcher(httpFetcher, numberOfRetries, time.Second*4)
-		concurrentCrawler = crawler.NewConcurrent(backoffRetryFetcher)
-	} else {
-		concurrentCrawler = crawler.NewConcurrent(httpFetcher)
-	}
+	//var concurrentCrawler crawler.Crawler
+	//if numberOfRetries > 0 {
+	//	backoffRetryFetcher := fetcher.NewExpBackoffRetryFetcher(httpFetcher, numberOfRetries, time.Second*4)
+	//	concurrentCrawler = crawler.NewConcurrent(backoffRetryFetcher)
+	//} else {
+	//	concurrentCrawler = crawler.NewConcurrent(httpFetcher)
+	//}
 
 	ctx := context.Background()
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
@@ -60,19 +60,39 @@ func main() {
 		cancelFunc()
 	}()
 
-	linkCount := 0
-	onNewLinkFound := func(link url.URL) {
-		linkCount++
-		fmt.Printf("[LINK %04d]\t%s\n", linkCount, link.String())
-	}
+	//linkCount := 0
+	//linkFoundCallback := func(link url.URL) {
+	//	linkCount++
+	//	fmt.Printf("[LINK %04d]\t%s\n", linkCount, link.String())
+	//}
 
 	// you can use the full crawling result set once finished
-	_, err := concurrentCrawler.Crawl(cancelCtx, parsedUrl, recursionLimit, onNewLinkFound)
-	if err != nil {
-		fmt.Printf("%v\n", err)
+	//_, err := concurrentCrawler.Crawl(cancelCtx, parsedUrl, recursionLimit, linkFoundCallback)
+	//if err != nil {
+	//	fmt.Printf("%v\n", err)
+	//}
+
+	//fmt.Printf("Total links found: %d\n", linkCount)
+
+	var anotherCrawler crawler.Crawler
+	if numberOfRetries > 0 {
+		backoffRetryFetcher := fetcher.NewExpBackoffRetryFetcher(httpFetcher, numberOfRetries, time.Second*4)
+		anotherCrawler = crawler.NewAnotherCrawler(backoffRetryFetcher)
+	} else {
+		anotherCrawler = crawler.NewAnotherCrawler(httpFetcher)
 	}
 
-	fmt.Printf("Total links found: %d\n", linkCount)
+	anotherLinkFoundCallback := func(link url.URL) {
+		fmt.Printf("[LINK] Crawling: %s\n", link.String())
+	}
+	anotherLinksFound, err := anotherCrawler.Crawl(cancelCtx, parsedUrl, 4, anotherLinkFoundCallback)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	for i, link := range anotherLinksFound {
+		fmt.Printf("[ANOTHER LINK %04d]\t%s\n", i, link)
+	}
+	fmt.Printf("Another Total links found: %d\n", len(anotherLinksFound))
 }
 
 func validateUrlToCrawl(urlToCrawlArg string) url.URL {

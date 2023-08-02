@@ -12,8 +12,10 @@ import (
 	"github.com/andiblas/website-crawler/pkg/linkextractor"
 )
 
+type linkFoundCallback func(link url.URL)
+
 type Crawler interface {
-	Crawl(ctx context.Context, urlToCrawl url.URL, recursionLimit int, onNewLinksFound func(link url.URL)) ([]string, error)
+	Crawl(ctx context.Context, urlToCrawl url.URL, depth int, onNewLinksFound linkFoundCallback) ([]string, error)
 }
 
 type Concurrent struct {
@@ -31,7 +33,7 @@ func NewConcurrent(fetcher fetcher.Fetcher) *Concurrent {
 //	ctx := context.Background()
 //	u, err := url.Parse("https://test.com")
 //	linksFound, err := concurrent.Crawl(ctx, u, 2)
-func (c *Concurrent) Crawl(ctx context.Context, urlToCrawl url.URL, recursionLimit int, onNewLinkFound func(link url.URL)) ([]string, error) {
+func (c *Concurrent) Crawl(ctx context.Context, urlToCrawl url.URL, recursionLimit int, onNewLinkFound linkFoundCallback) ([]string, error) {
 	finishCh := make(chan bool)
 	errorsCh := make(chan error)
 	visitedLinksMap := sync.Map{}
@@ -70,7 +72,7 @@ func (c *Concurrent) Crawl(ctx context.Context, urlToCrawl url.URL, recursionLim
 	return crawledLinks, nil
 }
 
-func crawlerWorker(urlToCrawl url.URL, recursionLimit int, onNewLinkFound func(link url.URL), fetcher fetcher.Fetcher, visitedLinksMap *sync.Map, errorsCh chan error, finishCh chan bool) {
+func crawlerWorker(urlToCrawl url.URL, recursionLimit int, onNewLinkFound linkFoundCallback, fetcher fetcher.Fetcher, visitedLinksMap *sync.Map, errorsCh chan error, finishCh chan bool) {
 	if _, loaded := visitedLinksMap.LoadOrStore(urlToCrawl.String(), true); loaded {
 		finishCh <- true
 		return
@@ -119,4 +121,72 @@ func crawlWebpage(httpFetcher fetcher.Fetcher, webpageURL url.URL) ([]url.URL, e
 	}
 
 	return links, nil
+}
+
+type AnotherCrawler struct {
+	fetcher fetcher.Fetcher
+}
+
+func NewAnotherCrawler(fetcher fetcher.Fetcher) *AnotherCrawler {
+	return &AnotherCrawler{fetcher: fetcher}
+}
+
+func (a *AnotherCrawler) Crawl(ctx context.Context, urlToCrawl url.URL, depth int, linkCallback linkFoundCallback) ([]string, error) {
+	visitedLinks := sync.Map{}
+
+	crawlInner(ctx, []url.URL{urlToCrawl}, a.fetcher, &visitedLinks, depth, linkCallback)
+
+	var crawledLinks []string
+	visitedLinks.Range(func(key, value any) bool {
+		crawledLinks = append(crawledLinks, key.(string))
+		return true
+	})
+
+	return crawledLinks, nil
+}
+
+func crawlInner(ctx context.Context, treeNodes []url.URL, fetcher fetcher.Fetcher, visitedLinks *sync.Map, depth int, linkCallback linkFoundCallback) {
+	var totalReferencedLinksAtDepth []url.URL
+
+	batches := buildBatches(treeNodes, 10)
+	for _, batch := range batches {
+
+		if errors.Is(ctx.Err(), context.Canceled) {
+			return
+		}
+
+		wg := sync.WaitGroup{}
+		for _, linkInBatch := range batch {
+			if _, loaded := visitedLinks.LoadOrStore(linkInBatch.String(), true); loaded {
+				continue
+			}
+
+			wg.Add(1)
+			if linkCallback != nil {
+				linkCallback(linkInBatch)
+			}
+
+			go func(link url.URL) {
+				defer wg.Done()
+				links, _ := crawlWebpage(fetcher, link)
+				totalReferencedLinksAtDepth = append(totalReferencedLinksAtDepth, links...)
+			}(linkInBatch)
+		}
+		wg.Wait()
+	}
+	if depth-1 > 0 {
+		crawlInner(ctx, totalReferencedLinksAtDepth, fetcher, visitedLinks, depth-1, linkCallback)
+	}
+}
+
+func buildBatches(treeNodes []url.URL, batchSize int) [][]url.URL {
+	var result [][]url.URL
+	for i := 0; i < len(treeNodes); i += batchSize {
+		j := i + batchSize
+		if j > len(treeNodes) {
+			j = len(treeNodes)
+		}
+		result = append(result, treeNodes[i:j])
+	}
+	return result
 }
