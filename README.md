@@ -27,7 +27,7 @@ make URL=https://parserdigital.com
 ```
 
 #### Arguments
-- `URL` URL to crawl
+- `URL` URL to crawl.
 - `DEPTH` Sets the crawling depth. The depth is delimited by each time the crawler continues crawling on new discovered pages. Must be greater than 0.
 - `MAX_CONCURRENCY` Sets the maximum concurrent requests the crawler can do. Must be greater than 0.
 - `TIMEOUT` Request timeout used to get webpages in milliseconds. Must be greater than 0.
