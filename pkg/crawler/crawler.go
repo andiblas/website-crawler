@@ -180,7 +180,7 @@ func safeCrawlingErrorCallback(errorCallback crawlingErrorCallback, link url.URL
 	go func(l url.URL, e error) {
 		defer func() {
 			if err := recover(); err != nil {
-				fmt.Println("[RECOVERED] recovered from linkFoundCallback")
+				fmt.Println("[RECOVERED] recovered from errorCallback")
 			}
 		}()
 		errorCallback(l, e)
