@@ -3,6 +3,7 @@ package crawler
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"sync"
 
@@ -149,7 +150,9 @@ func crawlWebpage(httpFetcher fetcher.Fetcher, webpageURL url.URL) ([]url.URL, e
 	if err != nil {
 		return nil, err
 	}
-	defer webpageReader.Close()
+	defer func(webpageReader io.ReadCloser) {
+		_ = webpageReader.Close()
+	}(webpageReader)
 
 	links, err := linkextractor.Extract(webpageURL, webpageReader)
 	if err != nil {
