@@ -51,6 +51,7 @@ func main() {
 
 	ctx := context.Background()
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
+	defer cancelFunc()
 
 	go func() {
 		// listen for interrupt signal
@@ -77,15 +78,15 @@ func main() {
 	var anotherCrawler crawler.Crawler
 	if numberOfRetries > 0 {
 		backoffRetryFetcher := fetcher.NewExpBackoffRetryFetcher(httpFetcher, numberOfRetries, time.Second*4)
-		anotherCrawler = crawler.NewAnotherCrawler(backoffRetryFetcher)
+		anotherCrawler = crawler.NewBreadthFirstCrawler(backoffRetryFetcher)
 	} else {
-		anotherCrawler = crawler.NewAnotherCrawler(httpFetcher)
+		anotherCrawler = crawler.NewBreadthFirstCrawler(httpFetcher)
 	}
 
 	anotherLinkFoundCallback := func(link url.URL) {
 		fmt.Printf("[LINK] Crawling: %s\n", link.String())
 	}
-	anotherLinksFound, err := anotherCrawler.Crawl(cancelCtx, parsedUrl, 4, anotherLinkFoundCallback)
+	anotherLinksFound, err := anotherCrawler.Crawl(cancelCtx, parsedUrl, 4, 5, anotherLinkFoundCallback)
 	if err != nil {
 		log.Fatalln(err)
 	}

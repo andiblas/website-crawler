@@ -15,7 +15,7 @@ import (
 type linkFoundCallback func(link url.URL)
 
 type Crawler interface {
-	Crawl(ctx context.Context, urlToCrawl url.URL, depth int, onNewLinksFound linkFoundCallback) ([]string, error)
+	Crawl(ctx context.Context, urlToCrawl url.URL, depth, maxConcurrency int, onNewLinksFound linkFoundCallback) ([]string, error)
 }
 
 type Concurrent struct {
@@ -123,18 +123,18 @@ func crawlWebpage(httpFetcher fetcher.Fetcher, webpageURL url.URL) ([]url.URL, e
 	return links, nil
 }
 
-type AnotherCrawler struct {
+type BreadthFirstCrawler struct {
 	fetcher fetcher.Fetcher
 }
 
-func NewAnotherCrawler(fetcher fetcher.Fetcher) *AnotherCrawler {
-	return &AnotherCrawler{fetcher: fetcher}
+func NewBreadthFirstCrawler(fetcher fetcher.Fetcher) *BreadthFirstCrawler {
+	return &BreadthFirstCrawler{fetcher: fetcher}
 }
 
-func (a *AnotherCrawler) Crawl(ctx context.Context, urlToCrawl url.URL, depth int, linkCallback linkFoundCallback) ([]string, error) {
+func (a *BreadthFirstCrawler) Crawl(ctx context.Context, urlToCrawl url.URL, depth, maxConcurrency int, linkCallback linkFoundCallback) ([]string, error) {
 	visitedLinks := sync.Map{}
 
-	crawlInner(ctx, []url.URL{urlToCrawl}, a.fetcher, &visitedLinks, depth, linkCallback)
+	crawlInner(ctx, []url.URL{urlToCrawl}, a.fetcher, &visitedLinks, depth, maxConcurrency, linkCallback)
 
 	var crawledLinks []string
 	visitedLinks.Range(func(key, value any) bool {
@@ -145,10 +145,10 @@ func (a *AnotherCrawler) Crawl(ctx context.Context, urlToCrawl url.URL, depth in
 	return crawledLinks, nil
 }
 
-func crawlInner(ctx context.Context, treeNodes []url.URL, fetcher fetcher.Fetcher, visitedLinks *sync.Map, depth int, linkCallback linkFoundCallback) {
+func crawlInner(ctx context.Context, treeNodes []url.URL, fetcher fetcher.Fetcher, visitedLinks *sync.Map, depth int, maxConcurrency int, linkCallback linkFoundCallback) {
 	var totalReferencedLinksAtDepth []url.URL
 
-	batches := buildBatches(treeNodes, 10)
+	batches := buildBatches(treeNodes, maxConcurrency)
 	for _, batch := range batches {
 
 		if errors.Is(ctx.Err(), context.Canceled) {
@@ -175,7 +175,7 @@ func crawlInner(ctx context.Context, treeNodes []url.URL, fetcher fetcher.Fetche
 		wg.Wait()
 	}
 	if depth-1 > 0 {
-		crawlInner(ctx, totalReferencedLinksAtDepth, fetcher, visitedLinks, depth-1, linkCallback)
+		crawlInner(ctx, totalReferencedLinksAtDepth, fetcher, visitedLinks, depth-1, 0, linkCallback)
 	}
 }
 
