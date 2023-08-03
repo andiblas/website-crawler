@@ -86,7 +86,8 @@ func main() {
 	anotherLinkFoundCallback := func(link url.URL) {
 		fmt.Printf("[LINK] Crawling: %s\n", link.String())
 	}
-	anotherLinksFound, err := anotherCrawler.Crawl(cancelCtx, parsedUrl, 4, 5, anotherLinkFoundCallback)
+	anotherLinksFound, err := anotherCrawler.Crawl(cancelCtx, parsedUrl, 4, 10, anotherLinkFoundCallback)
+
 	if err != nil {
 		log.Fatalln(err)
 	}
