@@ -15,7 +15,9 @@ In this case we implemented an HTML extractor that traverses all the webpage con
 
 #### [Crawler](pkg/crawler)
 The crawler itself is the one in charge of crawling a specific page using both the Fetcher and LinkExtractor.
-The implemented crawler does this in a concurrent fashion. When new links are found, the crawler creates a new crawler for each link that starts crawling concurrently.
+The crawling it's done in a Breadth First fashion, starting from the provided URL, and then browsing all the links referenced in the parent link from the current depth. 
+When all those links are crawled, the crawler jumps into the next depth level. You can control how many times the crawler will continue jumping into deeper levels with the
+`--depth` argument.
 
 ## How to use
 
@@ -26,7 +28,8 @@ make URL=https://parserdigital.com
 
 #### Arguments
 - `URL` URL to crawl
-- `RECURSION_LIMIT` Sets the amount of times the crawler will continue crawling in links found in a page. Must be greater than 0.
+- `DEPTH` Sets the crawling depth. The depth is delimited by each time the crawler continues crawling on new discovered pages. Must be greater than 0.
+- `MAX_CONCURRENCY` Sets the maximum concurrent requests the crawler can do. Must be greater than 0.
 - `TIMEOUT` Request timeout used to get webpages in milliseconds. Must be greater than 0.
 - `RETRIES` The number of retries the crawler will try to fetch a page in case of errors. Must be 0 or greater than 0.
 
