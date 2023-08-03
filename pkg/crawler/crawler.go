@@ -12,10 +12,20 @@ import (
 	"github.com/andiblas/website-crawler/pkg/linkextractor"
 )
 
+// InvalidDepth indicates that the provided depth for the crawl operation is invalid.
+// The depth value must be greater than 0.
+var InvalidDepth = errors.New("invalid depth. must be greater than 0")
+
+// InvalidMaxConcurrency indicates that the provided maximum concurrency value for
+// the crawl operation is invalid. The maxConcurrency value must be greater than 0
+// to allow concurrent crawling of multiple pages.
+var InvalidMaxConcurrency = errors.New("invalid maximum concurrency. must be greater than 0")
+
 type linkFoundCallback func(link url.URL)
+type crawlingErrorCallback func(link url.URL, err error)
 
 type Crawler interface {
-	Crawl(ctx context.Context, urlToCrawl url.URL, depth, maxConcurrency int, onNewLinksFound linkFoundCallback) ([]string, error)
+	Crawl(ctx context.Context, urlToCrawl url.URL, depth, maxConcurrency int, linkFound linkFoundCallback, errorCallback crawlingErrorCallback) ([]string, error)
 }
 
 type BreadthFirstCrawler struct {
@@ -26,10 +36,56 @@ func NewBreadthFirstCrawler(fetcher fetcher.Fetcher) *BreadthFirstCrawler {
 	return &BreadthFirstCrawler{fetcher: fetcher}
 }
 
-func (a *BreadthFirstCrawler) Crawl(ctx context.Context, urlToCrawl url.URL, depth, maxConcurrency int, linkCallback linkFoundCallback) ([]string, error) {
+// Crawl performs a breadth-first web crawling starting from the specified URL.
+// It explores the web pages up to the specified depth and concurrently crawls
+// multiple pages based on the given maxConcurrency. The linkCallback function
+// is executed each time a new link is discovered.
+//
+// The function takes the following parameters:
+//   - ctx: Context that can be used to cancel the crawl operation.
+//   - urlToCrawl: The initial URL from which the crawl will start.
+//   - depth: The maximum depth of web page exploration during the crawl.
+//   - maxConcurrency: The maximum number of pages to crawl concurrently.
+//   - linkCallback: A function that will be called for each link found during the crawl.
+//     It is called asynchronously for each link.
+//
+// The function returns an array of crawled URLs and an error. The crawled URLs
+// are URLs that have been successfully visited during the crawl process. If an
+// error occurs during the crawl, it is returned as an error value.
+//
+// If the provided depth is zero or negative, the function returns an error of type crawler.InvalidDepth.
+// If the provided maxConcurrency is zero or negative, the function returns an error of type crawler.InvalidMaxConcurrency.
+//
+// The function uses breadth-first crawling to explore web pages and ensures that
+// no duplicate URLs are visited. It also gracefully cancels the crawl if the provided
+// context is canceled, allowing for clean shutdown of the crawling process.
+//
+// Please note that the linkFoundCallback and crawlingErrorCallback functions are executed
+// in separate goroutines to do not hinder the main crawling process.
+//
+// Example usage:
+//
+//	crawler := crawler.NewBreadthFirstCrawler(fetcher)
+//	urlToCrawl, _ := url.Parse("https://example.com")
+//	depth := 3
+//	maxConcurrency := 10
+//	crawledLinks, err := crawler.Crawl(context.Background(), *urlToCrawl, depth, maxConcurrency, myLinkCallback)
+//	if err != nil {
+//	    fmt.Println("Error occurred during the crawl:", err)
+//	} else {
+//	    fmt.Println("Crawled links:", crawledLinks)
+//	}
+func (a *BreadthFirstCrawler) Crawl(ctx context.Context, urlToCrawl url.URL, depth, maxConcurrency int, linkFound linkFoundCallback, errorCallback crawlingErrorCallback) ([]string, error) {
+	if depth <= 0 {
+		return nil, InvalidDepth
+	}
+	if maxConcurrency <= 0 {
+		return nil, InvalidMaxConcurrency
+	}
+
 	visitedLinks := sync.Map{}
 
-	crawlInner(ctx, []url.URL{linkextractor.Normalize(urlToCrawl)}, a.fetcher, &visitedLinks, depth, maxConcurrency, linkCallback)
+	crawlInner(ctx, []url.URL{linkextractor.Normalize(urlToCrawl)}, a.fetcher, &visitedLinks, depth, maxConcurrency, linkFound, errorCallback)
 
 	var crawledLinks []string
 	visitedLinks.Range(func(key, value any) bool {
@@ -40,7 +96,7 @@ func (a *BreadthFirstCrawler) Crawl(ctx context.Context, urlToCrawl url.URL, dep
 	return crawledLinks, nil
 }
 
-func crawlInner(ctx context.Context, treeNodes []url.URL, fetcher fetcher.Fetcher, visitedLinks *sync.Map, depth int, maxConcurrency int, linkCallback linkFoundCallback) {
+func crawlInner(ctx context.Context, treeNodes []url.URL, fetcher fetcher.Fetcher, visitedLinks *sync.Map, depth int, maxConcurrency int, linkCallback linkFoundCallback, errorCallback crawlingErrorCallback) {
 	var totalReferencedLinksAtDepth []url.URL
 
 	batches := buildBatches(treeNodes, maxConcurrency)
@@ -57,13 +113,14 @@ func crawlInner(ctx context.Context, treeNodes []url.URL, fetcher fetcher.Fetche
 			}
 
 			wg.Add(1)
-			safeCallback(linkCallback, linkInBatch)
+			safeLinkFoundCallback(linkCallback, linkInBatch)
 
 			go func(link url.URL) {
 				defer wg.Done()
 				links, err := crawlWebpage(fetcher, link)
 				if err != nil {
-					fmt.Printf("[ERROR] error while crawling [%s] err: %v\n", link.String(), err)
+					safeCrawlingErrorCallback(errorCallback, link, err)
+					return
 				}
 				totalReferencedLinksAtDepth = append(totalReferencedLinksAtDepth, links...)
 			}(linkInBatch)
@@ -71,7 +128,7 @@ func crawlInner(ctx context.Context, treeNodes []url.URL, fetcher fetcher.Fetche
 		wg.Wait()
 	}
 	if depth-1 > 0 {
-		crawlInner(ctx, totalReferencedLinksAtDepth, fetcher, visitedLinks, depth-1, maxConcurrency, linkCallback)
+		crawlInner(ctx, totalReferencedLinksAtDepth, fetcher, visitedLinks, depth-1, maxConcurrency, linkCallback, nil)
 	}
 }
 
@@ -102,7 +159,7 @@ func crawlWebpage(httpFetcher fetcher.Fetcher, webpageURL url.URL) ([]url.URL, e
 	return links, nil
 }
 
-func safeCallback(linkFound linkFoundCallback, link url.URL) {
+func safeLinkFoundCallback(linkFound linkFoundCallback, link url.URL) {
 	if linkFound == nil {
 		return
 	}
@@ -114,4 +171,18 @@ func safeCallback(linkFound linkFoundCallback, link url.URL) {
 		}()
 		linkFound(l)
 	}(link)
+}
+
+func safeCrawlingErrorCallback(errorCallback crawlingErrorCallback, link url.URL, err error) {
+	if errorCallback == nil {
+		return
+	}
+	go func(l url.URL, e error) {
+		defer func() {
+			if err := recover(); err != nil {
+				fmt.Println("[RECOVERED] recovered from linkFoundCallback")
+			}
+		}()
+		errorCallback(l, e)
+	}(link, err)
 }

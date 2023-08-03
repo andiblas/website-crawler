@@ -64,10 +64,13 @@ func main() {
 		bfCrawler = crawler.NewBreadthFirstCrawler(httpFetcher)
 	}
 
+	errorCallback := func(link url.URL, err error) {
+		fmt.Printf("[ERROR] error while crawling [%s] err: %v\n", link.String(), err)
+	}
 	linkFoundCb := func(link url.URL) {
 		fmt.Printf("[LINK] Crawling: %s\n", link.String())
 	}
-	links, err := bfCrawler.Crawl(cancelCtx, parsedUrl, depth, maxConcurrency, linkFoundCb)
+	links, err := bfCrawler.Crawl(cancelCtx, parsedUrl, depth, maxConcurrency, linkFoundCb, errorCallback)
 
 	if err != nil {
 		log.Fatalln(err)
