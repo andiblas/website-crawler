@@ -148,7 +148,7 @@ func TestBreadthFirstCrawler_Crawl(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:   "crawl with canceled context gets interrupted and should not return any link",
+			name:   "crawl with canceled context gets interrupted and should not return no links",
 			fields: fields{newMockFetcher(nil)},
 			args: args{
 				ctx:            canceledCtx,
