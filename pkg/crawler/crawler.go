@@ -85,8 +85,20 @@ func (a *BreadthFirstCrawler) Crawl(ctx context.Context, urlToCrawl url.URL, dep
 	}
 
 	visitedLinks := sync.Map{}
+	linksAtDepth := []url.URL{linkextractor.Normalize(urlToCrawl)}
 
-	crawlInner(ctx, []url.URL{linkextractor.Normalize(urlToCrawl)}, a.fetcher, &visitedLinks, depth, maxConcurrency, linkFound, errorCallback)
+	for currentDepth := 0; currentDepth < depth; currentDepth++ {
+		batches := buildBatches(linksAtDepth, maxConcurrency)
+		linksAtDepth = nil
+		for _, batch := range batches {
+			// graceful cancel before starting a new batch
+			if errors.Is(ctx.Err(), context.Canceled) {
+				break
+			}
+
+			linksAtDepth = append(linksAtDepth, crawlBatchConcurrently(batch, &visitedLinks, a.fetcher, linkFound, errorCallback)...)
+		}
+	}
 
 	var crawledLinks []string
 	visitedLinks.Range(func(key, value any) bool {
@@ -97,50 +109,39 @@ func (a *BreadthFirstCrawler) Crawl(ctx context.Context, urlToCrawl url.URL, dep
 	return crawledLinks, nil
 }
 
-func crawlInner(ctx context.Context, treeNodes []url.URL, fetcher fetcher.Fetcher, visitedLinks *sync.Map, depth int, maxConcurrency int, linkCallback linkFoundCallback, errorCallback crawlingErrorCallback) {
-	var totalReferencedLinksAtDepth []url.URL
-
-	batches := buildBatches(treeNodes, maxConcurrency)
-	for _, batch := range batches {
-		// graceful cancel before starting a new batch
-		if errors.Is(ctx.Err(), context.Canceled) {
-			return
+func crawlBatchConcurrently(batch []url.URL, visitedLinks *sync.Map, fetcher fetcher.Fetcher, linkFound linkFoundCallback, errorCallback crawlingErrorCallback) []url.URL {
+	var result []url.URL
+	wg := sync.WaitGroup{}
+	for _, linkInBatch := range batch {
+		if _, linkExists := visitedLinks.LoadOrStore(linkInBatch.String(), true); linkExists {
+			continue
 		}
 
-		wg := sync.WaitGroup{}
-		for _, linkInBatch := range batch {
-			if _, loaded := visitedLinks.LoadOrStore(linkInBatch.String(), true); loaded {
-				continue
+		wg.Add(1)
+		safeLinkFoundCallback(linkFound, linkInBatch)
+
+		go func(link url.URL) {
+			defer wg.Done()
+			links, err := crawlWebpage(fetcher, link)
+			if err != nil {
+				safeCrawlingErrorCallback(errorCallback, link, err)
+				return
 			}
-
-			wg.Add(1)
-			safeLinkFoundCallback(linkCallback, linkInBatch)
-
-			go func(link url.URL) {
-				defer wg.Done()
-				links, err := crawlWebpage(fetcher, link)
-				if err != nil {
-					safeCrawlingErrorCallback(errorCallback, link, err)
-					return
-				}
-				totalReferencedLinksAtDepth = append(totalReferencedLinksAtDepth, links...)
-			}(linkInBatch)
-		}
-		wg.Wait()
+			result = append(result, links...)
+		}(linkInBatch)
 	}
-	if depth-1 > 0 {
-		crawlInner(ctx, totalReferencedLinksAtDepth, fetcher, visitedLinks, depth-1, maxConcurrency, linkCallback, nil)
-	}
+	wg.Wait()
+	return result
 }
 
-func buildBatches(treeNodes []url.URL, batchSize int) [][]url.URL {
+func buildBatches(urlsToCrawl []url.URL, batchSize int) [][]url.URL {
 	var result [][]url.URL
-	for i := 0; i < len(treeNodes); i += batchSize {
+	for i := 0; i < len(urlsToCrawl); i += batchSize {
 		j := i + batchSize
-		if j > len(treeNodes) {
-			j = len(treeNodes)
+		if j > len(urlsToCrawl) {
+			j = len(urlsToCrawl)
 		}
-		result = append(result, treeNodes[i:j])
+		result = append(result, urlsToCrawl[i:j])
 	}
 	return result
 }
