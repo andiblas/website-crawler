@@ -21,6 +21,19 @@ type BreadthFirstCrawler struct {
 	onError   crawlingErrorCallback
 }
 
+// NewBreadthFirstCrawler creates a new breadth first crawler with the given fetcher and options.
+//
+// Parameters:
+//   - fetcher: The fetcher implementation used to retrieve webpage content.
+//   - opts: Optional variadic list of functional options to configure the crawler.
+//
+// Returns:
+//   - A new instance of BreadthFirstCrawler initialized with the provided fetcher and options.
+//
+// Example:
+//
+//	fetcher := &MyFetcher{} // Replace with your fetcher implementation
+//	crawler := NewBreadthFirstCrawler(fetcher, WithLinkFoundCallback(myLinkFoundCallback), WithOnErrorCallback(myErrorCallback))
 func NewBreadthFirstCrawler(fetcher fetcher.Fetcher, opts ...Option) *BreadthFirstCrawler {
 	bfc := &BreadthFirstCrawler{fetcher: fetcher}
 
@@ -36,35 +49,37 @@ func NewBreadthFirstCrawler(fetcher fetcher.Fetcher, opts ...Option) *BreadthFir
 // multiple pages based on the given maxConcurrency. The linkCallback function
 // is executed each time a new link is discovered.
 //
-// The function takes the following parameters:
-//   - ctx: Context that can be used to cancel the crawl operation.
+// Parameters:
+//   - ctx: The context used for cancellation and managing the crawl operation.
 //   - urlToCrawl: The initial URL from which the crawl will start.
 //   - depth: The maximum depth of web page exploration during the crawl.
 //   - maxConcurrency: The maximum number of pages to crawl concurrently.
-//   - linkCallback: A function that will be called for each link found during the crawl.
-//     It is called asynchronously for each link.
 //
-// The function returns an array of crawled URLs and an error. The crawled URLs
-// are URLs that have been successfully visited during the crawl process. If an
-// error occurs during the crawl, it is returned as an error value.
+// Returns:
+//   - An array of crawled URLs and an error. The crawled URLs are URLs that have
+//     been found during the crawl process. The returned errors are for validation
+//     purposes only. If you need to read an error while crawling a page, use the
+//     WithOnErrorCallback option at the time of building this crawler.
 //
-// If the provided depth is zero or negative, the function returns an error of type crawler.InvalidDepth.
-// If the provided maxConcurrency is zero or negative, the function returns an error of type crawler.InvalidMaxConcurrency.
+// Errors:
+//   - If the provided depth is zero or negative, the function returns an error of type InvalidDepth.
+//   - If the provided maxConcurrency is zero or negative, the function returns an error of type InvalidMaxConcurrency.
 //
 // The function uses breadth-first crawling to explore web pages and ensures that
 // no duplicate URLs are visited. It also gracefully cancels the crawl if the provided
 // context is canceled, allowing for clean shutdown of the crawling process.
 //
-// Please note that the linkFoundCallback and crawlingErrorCallback functions are executed
-// in separate goroutines to do not hinder the main crawling process.
+// The linkFoundCallback and crawlingErrorCallback functions are executed asynchronously
+// in separate goroutines to avoid hindering the main crawling process.
 //
 // Example usage:
 //
-//	crawler := crawler.NewBreadthFirstCrawler(fetcher)
+//	fetcher := &MyFetcher{} // Replace with your fetcher implementation
+//	crawler := NewBreadthFirstCrawler(fetcher)
 //	urlToCrawl, _ := url.Parse("https://example.com")
 //	depth := 3
 //	maxConcurrency := 10
-//	crawledLinks, err := crawler.Crawl(context.Background(), *urlToCrawl, depth, maxConcurrency, myLinkCallback)
+//	crawledLinks, err := crawler.Crawl(context.Background(), *urlToCrawl, depth, maxConcurrency)
 //	if err != nil {
 //	    fmt.Println("Error occurred during the crawl:", err)
 //	} else {
