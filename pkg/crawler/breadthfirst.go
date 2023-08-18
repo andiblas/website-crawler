@@ -1,40 +1,34 @@
 package crawler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/url"
 	"sync"
 
-	"golang.org/x/net/context"
-
 	"github.com/andiblas/website-crawler/pkg/fetcher"
 	"github.com/andiblas/website-crawler/pkg/linkextractor"
 )
 
-// InvalidDepth indicates that the provided depth for the crawl operation is invalid.
-// The depth value must be greater than 0.
-var InvalidDepth = errors.New("invalid depth. must be greater than 0")
-
-// InvalidMaxConcurrency indicates that the provided maximum concurrency value for
-// the crawl operation is invalid. The maxConcurrency value must be greater than 0
-// to allow concurrent crawling of multiple pages.
-var InvalidMaxConcurrency = errors.New("invalid maximum concurrency. must be greater than 0")
-
 type linkFoundCallback func(link url.URL)
 type crawlingErrorCallback func(link url.URL, err error)
 
-type Crawler interface {
-	Crawl(ctx context.Context, urlToCrawl url.URL, depth, maxConcurrency int, linkFound linkFoundCallback, errorCallback crawlingErrorCallback) ([]string, error)
-}
-
 type BreadthFirstCrawler struct {
-	fetcher fetcher.Fetcher
+	fetcher   fetcher.Fetcher
+	linkFound linkFoundCallback
+	onError   crawlingErrorCallback
 }
 
-func NewBreadthFirstCrawler(fetcher fetcher.Fetcher) *BreadthFirstCrawler {
-	return &BreadthFirstCrawler{fetcher: fetcher}
+func NewBreadthFirstCrawler(fetcher fetcher.Fetcher, opts ...Option) *BreadthFirstCrawler {
+	bfc := &BreadthFirstCrawler{fetcher: fetcher}
+
+	for _, opt := range opts {
+		opt(bfc)
+	}
+
+	return bfc
 }
 
 // Crawl performs a breadth-first web crawling starting from the specified URL.
@@ -76,7 +70,7 @@ func NewBreadthFirstCrawler(fetcher fetcher.Fetcher) *BreadthFirstCrawler {
 //	} else {
 //	    fmt.Println("Crawled links:", crawledLinks)
 //	}
-func (a *BreadthFirstCrawler) Crawl(ctx context.Context, urlToCrawl url.URL, depth, maxConcurrency int, linkFound linkFoundCallback, errorCallback crawlingErrorCallback) ([]string, error) {
+func (bfc *BreadthFirstCrawler) Crawl(ctx context.Context, urlToCrawl url.URL, depth, maxConcurrency int) ([]string, error) {
 	if depth <= 0 {
 		return nil, InvalidDepth
 	}
@@ -96,12 +90,12 @@ func (a *BreadthFirstCrawler) Crawl(ctx context.Context, urlToCrawl url.URL, dep
 				break
 			}
 
-			linksAtDepth = append(linksAtDepth, crawlBatchConcurrently(batch, visitedLinks, a.fetcher, errorCallback)...)
+			linksAtDepth = append(linksAtDepth, crawlBatchConcurrently(batch, visitedLinks, bfc.fetcher, bfc.onError)...)
 		}
 		for _, link := range linksAtDepth {
 			if _, ok := visitedLinks[link.String()]; !ok {
 				visitedLinks[link.String()] = false
-				safeLinkFoundCallback(linkFound, link)
+				safeLinkFoundCallback(bfc.linkFound, link)
 			}
 		}
 	}

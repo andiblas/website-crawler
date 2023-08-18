@@ -266,8 +266,8 @@ func TestBreadthFirstCrawler_Crawl(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := NewBreadthFirstCrawler(tt.fields.fetcher)
-			got, err := a.Crawl(tt.args.ctx, tt.args.urlToCrawl, tt.args.depth, tt.args.maxConcurrency, tt.args.linkFound, tt.args.errorCallback)
+			a := NewBreadthFirstCrawler(tt.fields.fetcher, WithLinkFoundCallback(tt.args.linkFound), WithOnErrorCallback(tt.args.errorCallback))
+			got, err := a.Crawl(tt.args.ctx, tt.args.urlToCrawl, tt.args.depth, tt.args.maxConcurrency)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Crawl() error = %v, wantErr %v", err, tt.wantErr)
 				return

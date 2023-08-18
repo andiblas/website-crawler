@@ -56,22 +56,27 @@ func main() {
 		cancelFunc()
 	}()
 
-	var bfCrawler crawler.Crawler
-	if numberOfRetries > 0 {
-		backoffRetryFetcher := fetcher.NewExpBackoffRetryFetcher(httpFetcher, numberOfRetries, time.Second*4)
-		bfCrawler = crawler.NewBreadthFirstCrawler(backoffRetryFetcher)
-	} else {
-		bfCrawler = crawler.NewBreadthFirstCrawler(httpFetcher)
-	}
-
 	errorCallback := func(link url.URL, err error) {
 		fmt.Printf("[ERROR] error while crawling [%s] err: %v\n", link.String(), err)
 	}
 	linkFoundCb := func(link url.URL) {
 		fmt.Printf("[LINK] Link found: %s\n", link.String())
 	}
-	links, err := bfCrawler.Crawl(cancelCtx, parsedUrl, depth, maxConcurrency, linkFoundCb, errorCallback)
 
+	var bfCrawler crawler.Crawler
+	if numberOfRetries > 0 {
+		backoffRetryFetcher := fetcher.NewExpBackoffRetryFetcher(httpFetcher, numberOfRetries, time.Second*4)
+		bfCrawler = crawler.NewBreadthFirstCrawler(
+			backoffRetryFetcher,
+			crawler.WithLinkFoundCallback(linkFoundCb),
+			crawler.WithOnErrorCallback(errorCallback))
+	} else {
+		bfCrawler = crawler.NewBreadthFirstCrawler(httpFetcher,
+			crawler.WithLinkFoundCallback(linkFoundCb),
+			crawler.WithOnErrorCallback(errorCallback))
+	}
+
+	links, err := bfCrawler.Crawl(cancelCtx, parsedUrl, depth, maxConcurrency)
 	if err != nil {
 		log.Fatalln(err)
 	}
