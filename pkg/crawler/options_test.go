@@ -8,7 +8,7 @@ import (
 
 type MockFetcher struct{}
 
-func (f *MockFetcher) FetchWebpageContent(url url.URL) (io.ReadCloser, error) {
+func (f *MockFetcher) FetchWebpageContent(_ url.URL) (io.ReadCloser, error) {
 	return nil, nil
 }
 
