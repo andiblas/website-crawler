@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/url"
 	"strings"
@@ -59,11 +60,12 @@ func TestBreadthFirstCrawler_Crawl(t *testing.T) {
 		errorCallback  crawlingErrorCallback
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    map[string]bool
-		wantErr bool
+		name          string
+		fields        fields
+		args          args
+		want          map[string]bool
+		wantLinkFound map[string]bool
+		wantErr       bool
 	}{
 		{
 			name:   "crawls with only one depth step and returns only one link (the provided url)",
@@ -77,9 +79,12 @@ func TestBreadthFirstCrawler_Crawl(t *testing.T) {
 				linkFound:      nil,
 			},
 			want: map[string]bool{
-				"https://test.com": true,
+				"https://test.com":          true,
+				"https://test.com/contact":  true,
+				"https://test.com/about-us": true,
 			},
-			wantErr: false,
+			wantLinkFound: nil,
+			wantErr:       false,
 		},
 		{
 			name:   "crawls up two depth levels and returns all pages at that depth level without repeating links and ignoring deeper links",
@@ -96,8 +101,10 @@ func TestBreadthFirstCrawler_Crawl(t *testing.T) {
 				"https://test.com":          true,
 				"https://test.com/contact":  true,
 				"https://test.com/about-us": true,
+				"https://test.com/depth3":   true,
 			},
-			wantErr: false,
+			wantLinkFound: nil,
+			wantErr:       false,
 		},
 		{
 			name:   "crawling way too deep should get all links",
@@ -117,7 +124,8 @@ func TestBreadthFirstCrawler_Crawl(t *testing.T) {
 				"https://test.com/depth3":   true,
 				"https://test.com/depth4":   true,
 			},
-			wantErr: false,
+			wantLinkFound: nil,
+			wantErr:       false,
 		},
 		{
 			name:   "invalid depth",
@@ -130,8 +138,9 @@ func TestBreadthFirstCrawler_Crawl(t *testing.T) {
 				errorCallback:  nil,
 				linkFound:      nil,
 			},
-			want:    map[string]bool{},
-			wantErr: true,
+			want:          map[string]bool{},
+			wantLinkFound: nil,
+			wantErr:       true,
 		},
 		{
 			name:   "invalid max concurrency",
@@ -144,8 +153,9 @@ func TestBreadthFirstCrawler_Crawl(t *testing.T) {
 				errorCallback:  nil,
 				linkFound:      nil,
 			},
-			want:    map[string]bool{},
-			wantErr: true,
+			want:          map[string]bool{},
+			wantLinkFound: nil,
+			wantErr:       true,
 		},
 		{
 			name:   "crawl with canceled context gets interrupted and should not return no links",
@@ -158,8 +168,9 @@ func TestBreadthFirstCrawler_Crawl(t *testing.T) {
 				errorCallback:  nil,
 				linkFound:      nil,
 			},
-			want:    map[string]bool{},
-			wantErr: false,
+			want:          map[string]bool{},
+			wantLinkFound: nil,
+			wantErr:       false,
 		},
 		{
 			name:   "crawl calls linkFound callback for each link found",
@@ -171,6 +182,7 @@ func TestBreadthFirstCrawler_Crawl(t *testing.T) {
 				maxConcurrency: 1,
 				errorCallback:  nil,
 				linkFound: func(link url.URL) {
+					fmt.Println("executing link found callback for", link.String())
 					linkFoundCh <- link
 				},
 			},
@@ -178,6 +190,12 @@ func TestBreadthFirstCrawler_Crawl(t *testing.T) {
 				"https://test.com":          true,
 				"https://test.com/contact":  true,
 				"https://test.com/about-us": true,
+				"https://test.com/depth3":   true,
+			},
+			wantLinkFound: map[string]bool{
+				"https://test.com/contact":  true,
+				"https://test.com/about-us": true,
+				"https://test.com/depth3":   true,
 			},
 			wantErr: false,
 		},
@@ -199,6 +217,12 @@ func TestBreadthFirstCrawler_Crawl(t *testing.T) {
 				"https://test.com":          true,
 				"https://test.com/contact":  true,
 				"https://test.com/about-us": true,
+				"https://test.com/depth3":   true,
+			},
+			wantLinkFound: map[string]bool{
+				"https://test.com/contact":  true,
+				"https://test.com/about-us": true,
+				"https://test.com/depth3":   true,
 			},
 			wantErr: false,
 		},
@@ -249,7 +273,7 @@ func TestBreadthFirstCrawler_Crawl(t *testing.T) {
 				return
 			}
 			if len(got) != len(tt.want) {
-				t.Errorf("Crawl() links len got %v want len %v", len(got), len(tt.want))
+				t.Errorf("Crawl() links len got %v want len %v\ngot\t\t%v\nwant\t%v", len(got), len(tt.want), got, tt.want)
 			}
 			for _, link := range got {
 				if _, ok := tt.want[link]; !ok {
@@ -257,7 +281,7 @@ func TestBreadthFirstCrawler_Crawl(t *testing.T) {
 				}
 			}
 			if tt.args.linkFound != nil {
-				for range tt.want {
+				for range tt.wantLinkFound {
 					select {
 					case linkFromCallback := <-linkFoundCh:
 						if _, ok := tt.want[linkFromCallback.String()]; !ok {

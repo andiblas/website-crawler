@@ -68,7 +68,7 @@ func main() {
 		fmt.Printf("[ERROR] error while crawling [%s] err: %v\n", link.String(), err)
 	}
 	linkFoundCb := func(link url.URL) {
-		fmt.Printf("[LINK] Crawling: %s\n", link.String())
+		fmt.Printf("[LINK] Link found: %s\n", link.String())
 	}
 	links, err := bfCrawler.Crawl(cancelCtx, parsedUrl, depth, maxConcurrency, linkFoundCb, errorCallback)
 

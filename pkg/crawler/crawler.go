@@ -84,7 +84,7 @@ func (a *BreadthFirstCrawler) Crawl(ctx context.Context, urlToCrawl url.URL, dep
 		return nil, InvalidMaxConcurrency
 	}
 
-	visitedLinks := sync.Map{}
+	visitedLinks := make(map[string]bool) // map of links found while crawling + whether is visited or not
 	linksAtDepth := []url.URL{linkextractor.Normalize(urlToCrawl)}
 
 	for currentDepth := 0; currentDepth < depth; currentDepth++ {
@@ -96,29 +96,36 @@ func (a *BreadthFirstCrawler) Crawl(ctx context.Context, urlToCrawl url.URL, dep
 				break
 			}
 
-			linksAtDepth = append(linksAtDepth, crawlBatchConcurrently(batch, &visitedLinks, a.fetcher, linkFound, errorCallback)...)
+			linksAtDepth = append(linksAtDepth, crawlBatchConcurrently(batch, visitedLinks, a.fetcher, errorCallback)...)
+		}
+		for _, link := range linksAtDepth {
+			if _, ok := visitedLinks[link.String()]; !ok {
+				visitedLinks[link.String()] = false
+				safeLinkFoundCallback(linkFound, link)
+			}
 		}
 	}
 
-	var crawledLinks []string
-	visitedLinks.Range(func(key, value any) bool {
-		crawledLinks = append(crawledLinks, key.(string))
-		return true
-	})
+	var i int
+	crawledLinks := make([]string, len(visitedLinks))
+	for link := range visitedLinks {
+		crawledLinks[i] = link
+		i++
+	}
 
 	return crawledLinks, nil
 }
 
-func crawlBatchConcurrently(batch []url.URL, visitedLinks *sync.Map, fetcher fetcher.Fetcher, linkFound linkFoundCallback, errorCallback crawlingErrorCallback) []url.URL {
+func crawlBatchConcurrently(batch []url.URL, visitedLinks map[string]bool, fetcher fetcher.Fetcher, errorCallback crawlingErrorCallback) []url.URL {
 	var result []url.URL
 	wg := sync.WaitGroup{}
 	for _, linkInBatch := range batch {
-		if _, linkExists := visitedLinks.LoadOrStore(linkInBatch.String(), true); linkExists {
+		if visitedLinks[linkInBatch.String()] {
 			continue
 		}
+		visitedLinks[linkInBatch.String()] = true
 
 		wg.Add(1)
-		safeLinkFoundCallback(linkFound, linkInBatch)
 
 		go func(link url.URL) {
 			defer wg.Done()
